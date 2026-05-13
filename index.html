@@ -484,6 +484,21 @@
             return mins >= 1290 && mins <= 1320; 
         };
 
+        window.getCheckpointWindow = function(taskStart, taskEnd) {
+            if (!taskStart) return { start: taskStart, end: taskEnd };
+            const [h, m] = taskStart.split(':').map(Number);
+            const mins = h * 60 + m;
+            
+            // CP 1: Kegiatan 03:50 s.d 07:20 (Buka 03:50 - 07:30)
+            if (mins >= 230 && mins <= 445) return { start: '03:50', end: '07:30' };
+            // CP 2: Kegiatan 15:00 s.d 17:54 (Buka 15:00 - 18:10)
+            if (mins >= 900 && mins < 1075) return { start: '15:00', end: '18:10' };
+            // CP 3: Kegiatan 17:55 s.d 22:00 (Buka 17:55 - 22:10)
+            if (mins >= 1075 && mins <= 1320) return { start: '17:55', end: '22:10' };
+            
+            return { start: taskStart, end: taskEnd };
+        };
+
         window.adminSelectedDate = window.getYYYYMMDD();
         let adminUnsubscribe = null;
         let musyrifUnsubscribe = null;
@@ -993,7 +1008,7 @@
                     { id: 3, start: '04:15', end: p.subuh, title: 'Tahajud, Witir & Hafalan', keterangan: 'Salat Tahajud min. 4 rakaat, Witir min. 3 rakaat. Pantau area WC.' },
                     { id: 4, start: p.subuh, end: addMins(p.subuh, 35), title: 'Salat Subuh & Zikir', keterangan: 'Jarak Azan-Ikamah 15 menit. Tetap di masjid & penuhi saf awal.' },
                     { id: 5, start: addMins(p.subuh, 35), end: '06:10', title: 'Halakah Al-Qur\'an', keterangan: 'Zikir pagi & Halakah. Halakah dimulai segera tanpa menunggu 05.30. Selesai pakem 06.10.' },
-                    { id: 6, start: '06:10', end: '07:00', title: 'Istirahat Pribadi', keterangan: 'Gunakan untuk keperluan pribadi, tetap pantau ketenangan asrama.' },
+                    { id: 6, start: '06:10', end: '07:00', title: 'Istirahat Pribadi', keterangan: 'Gunakan untuk keperluan pribadi, tetap pantau ketenangan asrama.', noCheck: true },
                     { id: 7, start: '07:00', end: '07:10', title: 'Persiapan Muhadatsah', keterangan: 'Pastikan perlengkapan sekolah dibawa agar tidak kembali ke asrama saat KBM.' },
                     { id: 8, start: '07:10', end: '07:20', title: 'Mendampingi Muhadatsah', keterangan: 'Pastikan santri aktif muhadatsah. Pukul 07.20 langsung masuk kelas.' },
                     { id: 9, start: '07:20', end: '15:00', title: 'Istirahat (Pagi - Siang)', keterangan: 'Waktu istirahat santri dan musyrif.', noCheck: true },
@@ -1011,7 +1026,7 @@
                     { id: 3, start: '04:15', end: p.subuh, title: 'Tahajud, Witir & Hafalan', keterangan: 'Salat Tahajud min. 4 rakaat, Witir min. 3 rakaat. Pantau area WC.' },
                     { id: 4, start: p.subuh, end: addMins(p.subuh, 35), title: 'Salat Subuh & Zikir', keterangan: 'Jarak Azan-Ikamah 10 menit. Tetap di masjid & penuhi saf awal.' },
                     { id: 5, start: addMins(p.subuh, 35), end: '06:10', title: 'Halakah Al-Qur\'an', keterangan: 'Zikir pagi & Halakah. Halakah dimulai segera tanpa menunggu 05.30. Selesai pakem 06.10.' },
-                    { id: 6, start: '06:10', end: '07:00', title: 'Istirahat Pribadi', keterangan: 'Gunakan untuk keperluan pribadi, tetap pantau ketenangan asrama.' },
+                    { id: 6, start: '06:10', end: '07:00', title: 'Istirahat Pribadi', keterangan: 'Gunakan untuk keperluan pribadi, tetap pantau ketenangan asrama.', noCheck: true },
                     { id: 7, start: '07:00', end: '07:10', title: 'Persiapan Muhadatsah', keterangan: 'Pastikan perlengkapan sekolah dibawa agar tidak kembali ke asrama saat KBM.' },
                     { id: 8, start: '07:10', end: '07:20', title: 'Mendampingi Muhadatsah', keterangan: 'Pastikan santri aktif muhadatsah. Pukul 07.20 langsung masuk kelas.' },
                     { id: 9, start: '07:20', end: '15:00', title: 'Istirahat (Waktu KBM)', keterangan: 'Kegiatan Belajar Mengajar berlangsung.', noCheck: true },
@@ -1255,10 +1270,20 @@
             const scheduleHariIni = generateSchedule(globalPrayers, now.getDay());
             const task = scheduleHariIni.find(t => t.id === taskId);
 
-            if (now < parseTime(task.start, now)) return showToast("Kegiatan ini belum waktunya!", "error");
-            if (now >= parseTime(task.end, now) && !window.checklistState[taskId]) return showToast("Waktu sudah terlewat!", "error");
+            const cp = window.getCheckpointWindow(task.start, task.end);
+            const s = parseTime(cp.start, now);
+            const e = parseTime(cp.end, now);
 
-            window.checklistState[taskId] = !window.checklistState[taskId];
+            if (now < s) return showToast("Waktu ceklis untuk sesi ini belum dimulai!", "error");
+            if (now >= e && !window.checklistState[taskId]) return showToast("Waktu ceklis untuk sesi ini sudah ditutup!", "error");
+
+            if (window.checklistState[taskId]) {
+                delete window.checklistState[taskId];
+            } else {
+                const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+                window.checklistState[taskId] = timeStr;
+            }
+            
             localStorage.setItem('isyrafState', JSON.stringify(window.checklistState));
             await saveDataToFirebase();
             window.forceRender = true;
@@ -1512,12 +1537,17 @@
 
             scheduleHariIni.forEach(task => {
                 const isNoCheck = task.noCheck || (task.noCheckOn && task.noCheckOn.includes(day));
-                const s = parseTime(task.start, now);
-                const e = parseTime(task.end, now);
-                const isFut = now < s;
-                const isNow = now >= s && now < e;
-                const isPas = now >= e;
-                const isChecked = window.checklistState[task.id] === true;
+                const cp = window.getCheckpointWindow(task.start, task.end);
+                const sCheck = parseTime(cp.start, now);
+                const eCheck = parseTime(cp.end, now);
+                const sActual = parseTime(task.start, now);
+                const eActual = parseTime(task.end, now);
+                
+                const isFut = now < sCheck;
+                const isNow = now >= sActual && now < eActual;
+                const isPas = now >= eCheck;
+                const checkValue = window.checklistState[task.id];
+                const isChecked = !!checkValue;
                 const noteText = window.notesState[task.id];
 
                 if (isNow) currentTask = task;
@@ -1539,10 +1569,11 @@
                     bHTML = isNow ? `<span class="text-[9px] bg-amber-100 text-amber-700 px-2 py-1 rounded-lg ml-2 font-black animate-pulse">${activeBadge}</span>` : `<span class="text-[9px] bg-slate-200 text-slate-500 px-2 py-1 rounded-lg ml-2 font-black">${inactiveBadge}</span>`;
                     bCls = isNow ? 'border-l-[5px] border-l-amber-400' : 'border-l-[5px] border-l-slate-300';
                 } else if (isChecked) {
+                    const timeBadge = typeof checkValue === 'string' ? ` <span class="bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded-md ml-1 text-[8px] tracking-wide"><i class="far fa-clock"></i> ${checkValue}</span>` : '';
                     sCls = 'glass-card bg-emerald-50/80 border-emerald-200 opacity-80 shadow-sm';
                     tCls = 'text-emerald-800 line-through';
                     iHTML = '<i class="fas fa-check-circle text-emerald-500 text-[28px]"></i>';
-                    bHTML = '<span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg ml-2 font-black">TUNTAS</span>';
+                    bHTML = `<span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg ml-2 font-black flex items-center w-max">TUNTAS${timeBadge}</span>`;
                     bCls = 'border-l-[5px] border-l-emerald-500';
                 } else if (isFut) {
                     sCls = 'glass-card bg-slate-50/40 opacity-60';
@@ -1650,7 +1681,8 @@
                     
                     let isPas = true;
                     if(isToday) {
-                        isPas = now >= parseTime(t.end, now);
+                        const cp = window.getCheckpointWindow(t.start, t.end);
+                        isPas = now >= parseTime(cp.end, now);
                     }
 
                     if (isChecked) sel++; else if (isPas) ter++; else bel++;
@@ -1791,7 +1823,8 @@
                                 
                                 let isPas = true;
                                 if (dStr === window.getYYYYMMDD()) {
-                                    isPas = new Date() >= parseTime(t.end, new Date());
+                                    const cp = window.getCheckpointWindow(t.start, t.end);
+                                    isPas = new Date() >= parseTime(cp.end, new Date());
                                 }
                                 if (isChecked) sel++; else if (isPas) ter++; else bel++;
                             });
