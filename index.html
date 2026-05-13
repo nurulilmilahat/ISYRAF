@@ -481,7 +481,8 @@
 
         window.isAbsensiTime = function(now = new Date()) {
             const mins = now.getHours() * 60 + now.getMinutes();
-            return mins >= 1290 && mins <= 1320; 
+            // Buka di sesi Pagi (07:10 - 07:20) ATAU Malam (21:30 - 22:00)
+            return (mins >= 430 && mins <= 440) || (mins >= 1290 && mins <= 1320); 
         };
 
         window.getCheckpointWindow = function(taskStart, taskEnd) {
@@ -507,7 +508,8 @@
         window.checklistState = JSON.parse(localStorage.getItem('isyrafState')) || {};
         window.notesState = JSON.parse(localStorage.getItem('isyrafNotes')) || {};
         window.attendanceState = JSON.parse(localStorage.getItem('isyrafAttendance')) || {};
-        window.attendanceSaved = localStorage.getItem('isyrafAttendanceSaved') === 'true'; 
+        window.attendanceSavedMorning = localStorage.getItem('isyrafAttendanceSavedMorning') === 'true'; 
+        window.attendanceSavedNight = localStorage.getItem('isyrafAttendanceSavedNight') === 'true'; 
 
         window.activeEditors = new Set();
         window.forceRender = true;
@@ -915,9 +917,13 @@
                         window.attendanceState = data.attendance;
                         localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
                     }
-                    if (data.attendanceSaved !== undefined) {
-                        window.attendanceSaved = data.attendanceSaved;
-                        localStorage.setItem('isyrafAttendanceSaved', window.attendanceSaved ? 'true' : 'false');
+                    if (data.attendanceSavedMorning !== undefined) {
+                        window.attendanceSavedMorning = data.attendanceSavedMorning;
+                        localStorage.setItem('isyrafAttendanceSavedMorning', window.attendanceSavedMorning ? 'true' : 'false');
+                    }
+                    if (data.attendanceSavedNight !== undefined) {
+                        window.attendanceSavedNight = data.attendanceSavedNight;
+                        localStorage.setItem('isyrafAttendanceSavedNight', window.attendanceSavedNight ? 'true' : 'false');
                     }
                     window.forceRender = true;
                     updateAppLoop();
@@ -1129,12 +1135,6 @@
         };
 
         window.switchTab = (tab) => {
-            const now = new Date();
-            if (tab === 'absensi' && !window.isAbsensiTime(now)) {
-                showToast("Form Absensi hanya terbuka pukul 21:30 s.d 22:00", "error");
-                return;
-            }
-
             document.getElementById('view-dashboard').classList.toggle('hidden', tab !== 'dashboard');
             document.getElementById('view-ceklis').classList.toggle('hidden', tab !== 'ceklis');
             document.getElementById('view-absensi').classList.toggle('hidden', tab !== 'absensi');
@@ -1147,11 +1147,7 @@
             
             const tabAbsensi = document.getElementById('tab-absensi');
             if (tabAbsensi) {
-                if (window.isAbsensiTime(now)) {
-                    tabAbsensi.className = tab === 'absensi' ? act : inact;
-                } else {
-                    tabAbsensi.className = inact + ' opacity-50 bg-slate-100 cursor-not-allowed';
-                }
+                tabAbsensi.className = tab === 'absensi' ? act : inact;
             }
         };
 
@@ -1166,25 +1162,6 @@
                 const date = document.getElementById('currentDateMusyrif');
                 if(clock) clock.innerText = timeStr;
                 if(date) date.innerHTML = `${dateStr} <i class="fas fa-satellite-dish ml-1 opacity-70"></i>`;
-                
-                const tabAbsensi = document.getElementById('tab-absensi');
-                const viewAbsensi = document.getElementById('view-absensi');
-                if (tabAbsensi) {
-                    if (window.isAbsensiTime(now)) {
-                        if (tabAbsensi.innerHTML.includes('fa-lock')) {
-                            tabAbsensi.innerHTML = 'Absensi';
-                            tabAbsensi.classList.remove('opacity-50', 'bg-slate-100', 'cursor-not-allowed');
-                        }
-                    } else {
-                        if (!tabAbsensi.innerHTML.includes('fa-lock')) {
-                            tabAbsensi.innerHTML = '<i class="fas fa-lock mr-1"></i> Absensi';
-                            tabAbsensi.classList.add('opacity-50', 'bg-slate-100', 'cursor-not-allowed');
-                        }
-                        if (viewAbsensi && !viewAbsensi.classList.contains('hidden')) {
-                            window.switchTab('dashboard'); 
-                        }
-                    }
-                }
 
                 if (window.forceRender || window.lastRenderTime !== currentMinStr) {
                     if (window.activeEditors.size === 0) {
@@ -1256,7 +1233,8 @@
                     checklist: window.checklistState,
                     notes: window.notesState,
                     attendance: window.attendanceState,
-                    attendanceSaved: window.attendanceSaved,
+                    attendanceSavedMorning: window.attendanceSavedMorning,
+                    attendanceSavedNight: window.attendanceSavedNight,
                     santri: window.daftarSantri,
                     lastUpdate: serverTimestamp()
                 }, { merge: true });
@@ -1387,8 +1365,15 @@
             });
             localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
 
-            window.attendanceSaved = true;
-            localStorage.setItem('isyrafAttendanceSaved', 'true');
+            const now = new Date();
+            const mins = now.getHours() * 60 + now.getMinutes();
+            if (mins >= 430 && mins <= 440) {
+                window.attendanceSavedMorning = true;
+                localStorage.setItem('isyrafAttendanceSavedMorning', 'true');
+            } else if (mins >= 1290 && mins <= 1320) {
+                window.attendanceSavedNight = true;
+                localStorage.setItem('isyrafAttendanceSavedNight', 'true');
+            }
 
             await saveDataToFirebase();
             showToast("Data absensi berhasil dikunci dan disinkronkan ke Pimpinan!", "success");
@@ -1453,7 +1438,22 @@
             const inputContainer = document.getElementById('absensiInputContainer');
             if(!container) return;
 
-            const isLocked = window.attendanceSaved;
+            const now = new Date();
+            const mins = now.getHours() * 60 + now.getMinutes();
+            let isLocked = false;
+            let isOutsideWindow = false;
+            let sesiText = '';
+
+            if (mins >= 430 && mins <= 440) {
+                isLocked = window.attendanceSavedMorning;
+                sesiText = 'Pagi';
+            } else if (mins >= 1290 && mins <= 1320) {
+                isLocked = window.attendanceSavedNight;
+                sesiText = 'Malam';
+            } else {
+                isLocked = true;
+                isOutsideWindow = true;
+            }
             
             if (inputContainer) {
                 if (isLocked) inputContainer.classList.add('hidden');
@@ -1499,20 +1499,29 @@
             });
 
             if(sortedSantri.length > 0) {
-                if (isLocked) {
+                if (isOutsideWindow) {
+                    html += `
+                    <div class="pt-4 mt-2 border-t border-slate-200/60">
+                        <button disabled class="w-full bg-slate-100 text-slate-500 font-bold py-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center cursor-not-allowed">
+                            <i class="fas fa-clock mr-2 text-lg"></i> DI LUAR WAKTU ABSENSI
+                        </button>
+                        <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Tombol Simpan hanya aktif pukul 07:10-07:20 dan 21:30-22:00</p>
+                    </div>
+                    `;
+                } else if (isLocked) {
                     html += `
                     <div class="pt-4 mt-2 border-t border-slate-200/60">
                         <button disabled class="w-full bg-emerald-100 text-emerald-700 font-bold py-3.5 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-center cursor-not-allowed">
-                            <i class="fas fa-check-circle mr-2 text-lg"></i> DATA ABSENSI TERSIMPAN
+                            <i class="fas fa-check-circle mr-2 text-lg"></i> DATA ABSENSI ${sesiText.toUpperCase()} TERSIMPAN
                         </button>
-                        <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Absensi hari ini telah dikunci dan masuk ke Rekap Pimpinan</p>
+                        <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Absensi ${sesiText} ini telah dikunci dan masuk ke Rekap Pimpinan</p>
                     </div>
                     `;
                 } else {
                     html += `
                     <div class="pt-4 mt-2 border-t border-slate-200/60">
                         <button id="btnSimpanAbsen" onclick="simpanAbsensiKeDB()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center">
-                            <i class="fas fa-save mr-2 text-lg"></i> SIMPAN DATA ABSENSI
+                            <i class="fas fa-save mr-2 text-lg"></i> SIMPAN DATA ABSENSI ${sesiText.toUpperCase()}
                         </button>
                         <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Tekan tombol ini agar data masuk ke Pimpinan</p>
                     </div>
@@ -1905,12 +1914,14 @@
                 window.checklistState = {};
                 window.notesState = {};
                 window.attendanceState = {};
-                window.attendanceSaved = false;
+                window.attendanceSavedMorning = false;
+                window.attendanceSavedNight = false;
                 window.notifiedTasks = new Set();
                 localStorage.setItem('isyrafState', '{}');
                 localStorage.setItem('isyrafNotes', '{}');
                 localStorage.setItem('isyrafAttendance', '{}');
-                localStorage.setItem('isyrafAttendanceSaved', 'false');
+                localStorage.setItem('isyrafAttendanceSavedMorning', 'false');
+                localStorage.setItem('isyrafAttendanceSavedNight', 'false');
                 localStorage.setItem('isyrafNotified', '[]');
                 localStorage.setItem('isyrafDate', today);
             }
