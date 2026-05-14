@@ -2033,11 +2033,11 @@
                         <div class="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden relative z-10"><div class="bg-primary-gradient h-full" style="width: ${musyrif.pct}%"></div></div>
                         ${absenHtml}
                         <div class="mt-4 pt-3 border-t border-slate-200/60 relative z-10">
-                            <button onclick="toggleDetailAdmin('${musyrifId}')" class="w-full flex justify-between items-center text-[10px] font-extrabold text-blue-700 bg-blue-50/50 hover:bg-blue-100 p-2.5 rounded-xl transition-all border border-blue-100">
+                            <button onclick="toggleDetailAdmin('${musyrif.uid}')" class="w-full flex justify-between items-center text-[10px] font-extrabold text-blue-700 bg-blue-50/50 hover:bg-blue-100 p-2.5 rounded-xl transition-all border border-blue-100">
                                 <span><i class="fas fa-list-check mr-1.5"></i> Lihat Rincian Tugas</span>
-                                <i id="icon-admin-${musyrifId}" class="fas fa-chevron-down"></i>
+                                <i id="icon-admin-${musyrif.uid}" class="fas fa-chevron-down"></i>
                             </button>
-                            <div id="detail-admin-${musyrifId}" class="hidden transition-all duration-300">
+                            <div id="detail-admin-${musyrif.uid}" class="hidden transition-all duration-300">
                                 ${detailHtml}
                             </div>
                         </div>
