@@ -381,22 +381,29 @@
         </header>
 
         <main class="max-w-md mx-auto p-5 animate-fade-in pb-10">
-            <!-- DISTRIBUSI SANTRI -->
+            <!-- MANAJEMEN KAMAR (DISTRIBUSI SANTRI) -->
             <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
-                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Distribusi Santri (Per Musyrif)</h3>
+                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Manajemen Kamar & Distribusi Santri</h3>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Pilih Musyrif</label>
-                        <select id="adminMusyrifSelect" onchange="loadMusyrifSantri(this.value)" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-400">
-                            <option value="">-- Memuat Musyrif --</option>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Pilih / Buat Kamar Baru</label>
+                        <select id="adminRoomSelect" onchange="loadRoomData(this.value)" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-400 mb-2">
+                            <option value="">-- Buat Kamar Baru --</option>
                         </select>
+                        <input type="text" id="adminRoomName" placeholder="Contoh: Kamar Abu Bakar" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Tugaskan Musyrif (Bisa lebih dari 1)</label>
+                        <div id="adminRoomMusyrifs" class="max-h-32 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-2 space-y-1">
+                            <div class="text-[11px] text-slate-500">Memuat musyrif...</div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Daftar Santri (Pisahkan dengan Enter)</label>
                         <textarea id="adminSantriInput" rows="4" placeholder="Ahmad Fauzi&#10;Budi Santoso&#10;Hasan Basri" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
                     </div>
-                    <button onclick="saveMusyrifSantri()" id="btnSaveSantriDist" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center text-[12px]">
-                        <i class="fas fa-save mr-2"></i> Simpan Daftar Santri
+                    <button onclick="saveRoomData()" id="btnSaveRoom" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center text-[12px]">
+                        <i class="fas fa-save mr-2"></i> Simpan Data Kamar
                     </button>
                 </div>
             </div>
@@ -468,10 +475,13 @@
 
         let localDevUid = localStorage.getItem('isyraf_dev_uid');
         let currentRole = localStorage.getItem('isyrafRole') || null;
+        let currentRoomId = null;
 
         let globalJadwal = [];
         let globalPrayers = {};
         let musyrifListState = {}; 
+        let globalRooms = {};
+        let adminRoomStates = {};
 
         window.togglePasswordVisibility = function(inputId, iconId) {
             const passInput = document.getElementById(inputId);
@@ -501,7 +511,6 @@
 
         window.isAbsensiTime = function(now = new Date()) {
             const mins = now.getHours() * 60 + now.getMinutes();
-            // Buka di sesi Pagi (07:10 - 07:20) ATAU Malam (21:30 - 22:00)
             return (mins >= 430 && mins <= 440) || (mins >= 1290 && mins <= 1320); 
         };
 
@@ -510,11 +519,8 @@
             const [h, m] = taskStart.split(':').map(Number);
             const mins = h * 60 + m;
             
-            // CP 1: Kegiatan 03:50 s.d 07:20 (Buka 03:50 - 07:30)
             if (mins >= 230 && mins <= 445) return { start: '03:50', end: '07:30' };
-            // CP 2: Kegiatan 15:00 s.d 17:54 (Buka 15:00 - 18:10)
             if (mins >= 900 && mins < 1075) return { start: '15:00', end: '18:10' };
-            // CP 3: Kegiatan 17:55 s.d 22:00 (Buka 17:55 - 22:10)
             if (mins >= 1075 && mins <= 1320) return { start: '17:55', end: '22:10' };
             
             return { start: taskStart, end: taskEnd };
@@ -522,8 +528,11 @@
 
         window.adminSelectedDate = window.getYYYYMMDD();
         let adminUnsubscribe = null;
+        let adminRoomsUnsubscribe = null;
+        let adminRoomStatesUnsubscribe = null;
         let musyrifUnsubscribe = null;
         let musyrifProfileUnsubscribe = null;
+        let roomPresenceUnsubscribe = null;
 
         window.daftarSantri = JSON.parse(localStorage.getItem('isyrafSantri')) || [];
         window.checklistState = JSON.parse(localStorage.getItem('isyrafState')) || {};
@@ -557,14 +566,11 @@
         const initFirebase = async () => {
             const auth = getAuth(app);
 
-            // Auto-whitelist admin@isyraf.com untuk pimpinan pertama kali (Fallback)
             try {
-                const q = query(collection(db, 'whitelist'), where('email', '==', 'admin@isyraf.com'));
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', 'admin@isyraf.com'));
                 const adminSnap = await getDocs(q);
                 if(adminSnap.empty) {
-                    // Gunakan addDoc atau setDoc dengan ID custom jika Anda mau,
-                    // Tapi karena sekarang di whitelist root, kita set pakai nama dokumen acak atau custom:
-                    const adminRef = doc(collection(db, 'whitelist')); 
+                    const adminRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist')); 
                     await setDoc(adminRef, { email: 'admin@isyraf.com', role: 'admin', name: 'Pimpinan Default' });
                 }
             } catch(e) { console.warn("Seed admin error:", e); }
@@ -576,7 +582,6 @@
                         const docSnap = await getDoc(userRef);
                         
                         if (docSnap.exists()) {
-                            // PROFIL DITEMUKAN - JALUR NORMAL
                             const userData = docSnap.data();
                             localStorage.setItem('isyrafRole', userData.role);
                             localStorage.setItem('isyraf_dev_uid', user.uid);
@@ -586,28 +591,24 @@
                             localDevUid = user.uid;
                             
                             initApp();
-                            if (currentRole === 'musyrif') syncUserPresence();
+                            if (currentRole === 'musyrif') {
+                                syncUserProfile();
+                                syncUserPresence();
+                            }
                         } else {
-                            // === FITUR AUTO-HEAL DIMULAI ===
-                            // Profil tidak ada di database, tapi user berhasil login (efek gagal daftar sebelumnya).
-                            // Kita cari emailnya di whitelist untuk memperbaiki/membangun ulang profilnya.
-                            const qWhitelist = query(collection(db, 'whitelist'), where('email', '==', user.email));
+                            const qWhitelist = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', user.email));
                             const wSnap = await getDocs(qWhitelist);
                             
                             if (!wSnap.empty) {
                                 const wData = wSnap.docs[0].data();
-                                
-                                // Buat ulang profil di Firestore
                                 const newProfile = {
                                     uid: user.uid,
                                     email: user.email,
                                     role: wData.role || 'musyrif',
                                     name: wData.name || user.email.split('@')[0]
                                 };
-                                
                                 await setDoc(userRef, newProfile);
                                 
-                                // Lanjutkan Login
                                 localStorage.setItem('isyrafRole', newProfile.role);
                                 localStorage.setItem('isyraf_dev_uid', user.uid);
                                 localStorage.setItem('isyrafUserName', newProfile.name);
@@ -617,26 +618,27 @@
                                 
                                 showToast("Pemulihan profil otomatis berhasil!", "success");
                         
-                        initApp();
-                        if (currentRole === 'musyrif') syncUserPresence();
-                    } else {
-                        // Jika ternyata di whitelist juga tidak ada, tendang keluar
-                        showToast("Profil tidak ditemukan dan tidak ada di whitelist.", "error");
+                                initApp();
+                                if (currentRole === 'musyrif') {
+                                    syncUserProfile();
+                                    syncUserPresence();
+                                }
+                            } else {
+                                showToast("Profil tidak ditemukan dan tidak ada di whitelist.", "error");
+                                handleLogout();
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Gagal memuat profil:", error);
+                        if (error.code === 'permission-denied') {
+                            showToast("Akses Ditolak: Periksa Security Rules Firestore Anda!", "error");
+                        } else {
+                            showToast("Gagal memuat profil sistem.", "error");
+                        }
                         handleLogout();
                     }
-                    // === FITUR AUTO-HEAL SELESAI ===
-                }
-            } catch (error) {
-                console.error("Gagal memuat profil:", error);
-                if (error.code === 'permission-denied') {
-                    showToast("Akses Ditolak: Periksa Security Rules Firestore Anda!", "error");
                 } else {
-                    showToast("Gagal memuat profil sistem.", "error");
-                }
-                handleLogout();
-            }
-        } else {
-            triggerLoading('screen-login');
+                    triggerLoading('screen-login');
                 }
             });
         };
@@ -655,7 +657,7 @@
             btn.disabled = true;
 
             try {
-                const q = query(collection(db, 'whitelist'), where('email', '==', email));
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', email));
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
@@ -736,28 +738,18 @@
             }
         };
 
-        // --- FUNGSI LUPA PASSWORD ---
         window.processForgotPassword = async function() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-            
-            // Wajibkan user mengisi emailnya dulu sebelum klik lupa password
-            if(!email) {
-                return showToast("Masukkan email Anda di kolom Email terlebih dahulu!", "error");
-            }
-            
+            if(!email) return showToast("Masukkan email Anda di kolom Email terlebih dahulu!", "error");
             try {
                 const auth = getAuth(app);
                 await sendPasswordResetEmail(auth, email);
                 showToast("Tautan reset password telah dikirim ke email Anda! Silakan cek Inbox/Spam.", "success");
             } catch (error) {
                 console.error("Reset Password Error:", error);
-                if (error.code === 'auth/user-not-found') {
-                    showToast("Email tersebut tidak terdaftar di sistem.", "error");
-                } else if (error.code === 'auth/invalid-email') {
-                    showToast("Format email tidak valid.", "error");
-                } else {
-                    showToast("Gagal mengirim email reset.", "error");
-                }
+                if (error.code === 'auth/user-not-found') showToast("Email tersebut tidak terdaftar di sistem.", "error");
+                else if (error.code === 'auth/invalid-email') showToast("Format email tidak valid.", "error");
+                else showToast("Gagal mengirim email reset.", "error");
             }
         };
 
@@ -775,13 +767,13 @@
             btn.disabled = true;
 
             try {
-                const q = query(collection(db, 'whitelist'), where('email', '==', email));
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', email));
                 const querySnapshot = await getDocs(q);
                 
                 if(!querySnapshot.empty) {
                     showToast("Email ini sudah ada di whitelist!", "error");
                 } else {
-                    await addDoc(collection(db, 'whitelist'), { 
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), { 
                         email: email, 
                         name: name, 
                         role: 'musyrif' 
@@ -801,62 +793,105 @@
         };
 
         window.loadAdminSantriManager = async function() {
-            const select = document.getElementById('adminMusyrifSelect');
-            if(!select) return;
-            select.innerHTML = '<option value="">Memuat data...</option>';
+            const selectRoom = document.getElementById('adminRoomSelect');
+            const containerMusyrifs = document.getElementById('adminRoomMusyrifs');
+            if(!selectRoom || !containerMusyrifs) return;
+
             try {
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), where('role', '==', 'musyrif'));
-                const snap = await getDocs(q);
-                let html = '<option value="">-- Pilih Musyrif --</option>';
-                snap.forEach(doc => {
+                // Fetch Musyrifs
+                const qMusyrifs = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), where('role', '==', 'musyrif'));
+                const snapM = await getDocs(qMusyrifs);
+                let htmlM = '';
+                window.adminAllMusyrifs = [];
+                snapM.forEach(doc => {
                     const data = doc.data();
-                    html += `<option value="${doc.id}">${data.name} (${data.email})</option>`;
+                    window.adminAllMusyrifs.push({ id: doc.id, ...data });
+                    htmlM += `<label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 rounded-lg cursor-pointer">
+                                <input type="checkbox" name="roomMusyrifCb" value="${doc.id}" class="w-4 h-4 text-blue-600 rounded border-slate-300">
+                                <span class="text-[11px] font-bold text-slate-700">${data.name} <span class="opacity-50 font-normal">(${data.email})</span></span>
+                              </label>`;
                 });
-                select.innerHTML = html;
+                containerMusyrifs.innerHTML = htmlM || '<div class="text-[11px] text-slate-500">Belum ada musyrif</div>';
+
+                // Fetch Rooms
+                const qRooms = query(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
+                const snapR = await getDocs(qRooms);
+                window.adminAllRooms = {};
+                let htmlR = '<option value="">-- Buat Kamar Baru --</option>';
+                snapR.forEach(doc => {
+                    window.adminAllRooms[doc.id] = doc.data();
+                    htmlR += `<option value="${doc.id}">${doc.data().name}</option>`;
+                });
+                selectRoom.innerHTML = htmlR;
             } catch(e) {
-                console.error("Error loading musyrifs:", e);
-                select.innerHTML = '<option value="">Gagal memuat</option>';
+                console.error("Error load admin manager:", e);
+                containerMusyrifs.innerHTML = '<div class="text-[11px] text-rose-500">Gagal memuat.</div>';
             }
         };
 
-        window.loadMusyrifSantri = async function(uid) {
-            const textarea = document.getElementById('adminSantriInput');
-            textarea.value = '';
-            if(!uid) return;
-            try {
-                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', uid);
-                const docSnap = await getDoc(userRef);
-                if(docSnap.exists()) {
-                    const data = docSnap.data();
-                    if(data.santri && Array.isArray(data.santri)) {
-                        textarea.value = data.santri.join('\n');
-                    }
+        window.loadRoomData = function(roomId) {
+            const inputName = document.getElementById('adminRoomName');
+            const inputSantri = document.getElementById('adminSantriInput');
+            const checkboxes = document.getElementsByName('roomMusyrifCb');
+
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if(!roomId) {
+                inputName.value = '';
+                inputSantri.value = '';
+                return;
+            }
+
+            const room = window.adminAllRooms[roomId];
+            if(room) {
+                inputName.value = room.name || '';
+                inputSantri.value = room.santri ? room.santri.join('\n') : '';
+                if(room.musyrifs) {
+                    checkboxes.forEach(cb => {
+                        if(room.musyrifs.includes(cb.value)) cb.checked = true;
+                    });
                 }
-            } catch(e) {
-                console.error("Error loading santri:", e);
-                showToast("Gagal memuat daftar santri", "error");
             }
         };
 
-        window.saveMusyrifSantri = async function() {
-            const uid = document.getElementById('adminMusyrifSelect').value;
+        window.saveRoomData = async function() {
+            const selectRoom = document.getElementById('adminRoomSelect');
+            const roomId = selectRoom.value;
+            const roomName = document.getElementById('adminRoomName').value.trim();
             const textarea = document.getElementById('adminSantriInput');
-            if(!uid) return showToast("Pilih Musyrif terlebih dahulu!", "error");
+            const checkboxes = document.getElementsByName('roomMusyrifCb');
+
+            if(!roomName) return showToast("Nama Kamar wajib diisi!", "error");
             
-            const btn = document.getElementById('btnSaveSantriDist');
+            const btn = document.getElementById('btnSaveRoom');
             const oriText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...';
             btn.disabled = true;
 
             const santriArr = textarea.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            const musyrifsArr = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
             
             try {
-                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', uid);
-                await setDoc(userRef, { santri: santriArr }, { merge: true });
-                showToast("Daftar santri berhasil disimpan ke profil Musyrif!", "success");
+                let docRef;
+                if(roomId) {
+                    docRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+                } else {
+                    const newId = roomName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+                    docRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newId);
+                }
+
+                await setDoc(docRef, { 
+                    name: roomName,
+                    santri: santriArr,
+                    musyrifs: musyrifsArr
+                }, { merge: true });
+                
+                showToast("Data kamar berhasil disimpan!", "success");
+                await window.loadAdminSantriManager(); 
+                selectRoom.value = docRef.id;
             } catch(e) {
-                console.error("Error saving santri:", e);
-                showToast("Gagal menyimpan daftar santri", "error");
+                console.error("Error saving room:", e);
+                showToast("Gagal menyimpan data kamar", "error");
             } finally {
                 btn.innerHTML = oriText;
                 btn.disabled = false;
@@ -865,23 +900,86 @@
 
         function syncUserProfile() {
             if(!localDevUid || currentRole !== 'musyrif') return;
-            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
+            const qRooms = query(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), where('musyrifs', 'array-contains', localDevUid));
+            
             if (musyrifProfileUnsubscribe) musyrifProfileUnsubscribe();
-            musyrifProfileUnsubscribe = onSnapshot(userRef, (snapshot) => {
+            musyrifProfileUnsubscribe = onSnapshot(qRooms, (snapshot) => {
+                if (!snapshot.empty) {
+                    const roomDoc = snapshot.docs[0];
+                    currentRoomId = roomDoc.id;
+                    const data = roomDoc.data();
+                    
+                    window.daftarSantri = data.santri || [];
+                    localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
+                    
+                    document.getElementById('musyrifNameDisplay').innerText = (localStorage.getItem('isyrafUserName') || 'Musyrif') + ` • ${data.name.toUpperCase()}`;
+
+                    window.daftarSantri.forEach(name => {
+                        if (!window.attendanceState[name]) {
+                            window.attendanceState[name] = 'H';
+                        }
+                    });
+                    localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+                    
+                    syncRoomPresence();
+                } else {
+                    currentRoomId = null;
+                    window.daftarSantri = [];
+                    document.getElementById('musyrifNameDisplay').innerText = (localStorage.getItem('isyrafUserName') || 'Musyrif') + ` • (BELUM ADA KAMAR)`;
+                }
+                window.forceRender = true;
+                updateAppLoop();
+            });
+        }
+
+        function syncRoomPresence() {
+            if(!currentRoomId) return;
+            const colName = 'room_states_' + window.getYYYYMMDD();
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', colName, currentRoomId);
+            
+            if (roomPresenceUnsubscribe) roomPresenceUnsubscribe();
+
+            roomPresenceUnsubscribe = onSnapshot(roomRef, (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data();
-                    if (data.santri && Array.isArray(data.santri)) {
-                        window.daftarSantri = data.santri;
-                        localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
-                        window.daftarSantri.forEach(name => {
-                            if (!window.attendanceState[name]) {
-                                window.attendanceState[name] = 'H';
-                            }
-                        });
+                    if (data.attendance) {
+                        window.attendanceState = data.attendance;
                         localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
-                        window.forceRender = true;
-                        updateAppLoop();
                     }
+                    if (data.savedMorning !== undefined) {
+                        window.attendanceSavedMorning = data.savedMorning;
+                        localStorage.setItem('isyrafAttendanceSavedMorning', window.attendanceSavedMorning ? 'true' : 'false');
+                    }
+                    if (data.savedNight !== undefined) {
+                        window.attendanceSavedNight = data.savedNight;
+                        localStorage.setItem('isyrafAttendanceSavedNight', window.attendanceSavedNight ? 'true' : 'false');
+                    }
+                    window.forceRender = true;
+                    updateAppLoop();
+                }
+            });
+        }
+
+        function syncUserPresence() {
+            if(!localDevUid) return;
+            const colName = 'states_' + window.getYYYYMMDD();
+            const userRef = doc(db, 'artifacts', appId, 'public', 'data', colName, localDevUid);
+            
+            if (musyrifUnsubscribe) musyrifUnsubscribe();
+
+            musyrifUnsubscribe = onSnapshot(userRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    if (data.checklist) {
+                        window.checklistState = data.checklist;
+                        localStorage.setItem('isyrafState', JSON.stringify(window.checklistState));
+                    }
+                    if (data.notes) {
+                        window.notesState = data.notes;
+                        localStorage.setItem('isyrafNotes', JSON.stringify(window.notesState));
+                    }
+                    window.forceRender = true;
+                    updateAppLoop();
                 }
             });
         }
@@ -1002,45 +1100,6 @@
             });
         }
 
-        function syncUserPresence() {
-            if(!localDevUid) return;
-            const colName = 'states_' + window.getYYYYMMDD();
-            const userRef = doc(db, 'artifacts', appId, 'public', 'data', colName, localDevUid);
-            
-            if (musyrifUnsubscribe) musyrifUnsubscribe();
-
-            musyrifUnsubscribe = onSnapshot(userRef, (snapshot) => {
-                if (snapshot.exists()) {
-                    const data = snapshot.data();
-                    if (data.checklist) {
-                        window.checklistState = data.checklist;
-                        localStorage.setItem('isyrafState', JSON.stringify(window.checklistState));
-                    }
-                    if (data.notes) {
-                        window.notesState = data.notes;
-                        localStorage.setItem('isyrafNotes', JSON.stringify(window.notesState));
-                    }
-                    if (data.attendance) {
-                        window.attendanceState = data.attendance;
-                        localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
-                    }
-                    if (data.attendanceSavedMorning !== undefined) {
-                        window.attendanceSavedMorning = data.attendanceSavedMorning;
-                        localStorage.setItem('isyrafAttendanceSavedMorning', window.attendanceSavedMorning ? 'true' : 'false');
-                    }
-                    if (data.attendanceSavedNight !== undefined) {
-                        window.attendanceSavedNight = data.attendanceSavedNight;
-                        localStorage.setItem('isyrafAttendanceSavedNight', window.attendanceSavedNight ? 'true' : 'false');
-                    }
-                    window.forceRender = true;
-                    updateAppLoop();
-                }
-            }, (error) => {
-                if (error.code === 'permission-denied') return;
-                console.error("Sync Error: ", error);
-            });
-        }
-
         window.changeAdminDate = function(dateVal) {
             if(!dateVal) return;
             window.adminSelectedDate = dateVal;
@@ -1050,9 +1109,9 @@
         function setupAdminListener() {
             if (currentRole !== 'admin') return;
 
-            if (adminUnsubscribe) {
-                adminUnsubscribe();
-            }
+            if (adminUnsubscribe) adminUnsubscribe();
+            if (adminRoomsUnsubscribe) adminRoomsUnsubscribe();
+            if (adminRoomStatesUnsubscribe) adminRoomStatesUnsubscribe();
 
             const isToday = window.adminSelectedDate === window.getYYYYMMDD();
             const liveBadge = document.getElementById('adminLiveBadge');
@@ -1066,9 +1125,25 @@
                 }
             }
 
+            const qRooms = query(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
+            adminRoomsUnsubscribe = onSnapshot(qRooms, (snap) => {
+                globalRooms = {};
+                snap.forEach(doc => globalRooms[doc.id] = doc.data());
+                window.forceRender = true;
+                updateAppLoop();
+            });
+
+            const colRoomStates = 'room_states_' + window.adminSelectedDate;
+            const qRoomStates = query(collection(db, 'artifacts', appId, 'public', 'data', colRoomStates));
+            adminRoomStatesUnsubscribe = onSnapshot(qRoomStates, (snap) => {
+                adminRoomStates = {};
+                snap.forEach(doc => adminRoomStates[doc.id] = doc.data());
+                window.forceRender = true;
+                updateAppLoop();
+            });
+
             const colName = 'states_' + window.adminSelectedDate;
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', colName));
-            
             adminUnsubscribe = onSnapshot(q, (snapshot) => {
                 musyrifListState = {};
                 snapshot.forEach(doc => {
@@ -1076,9 +1151,6 @@
                 });
                 window.forceRender = true;
                 updateAppLoop();
-            }, (error) => {
-                if (error.code === 'permission-denied') return;
-                console.error("Admin Listener Error:", error);
             });
         }
 
@@ -1196,7 +1268,6 @@
             if(currentRole === 'musyrif') {
                 target = 'screen-musyrif';
                 document.getElementById('musyrifNameDisplay').innerText = localStorage.getItem('isyrafUserName') || 'Musyrif';
-                syncUserProfile();
             } else if(currentRole === 'admin') {
                 target = 'screen-admin';
                 document.getElementById('adminDateSelector').value = window.adminSelectedDate;
@@ -1211,8 +1282,11 @@
 
         window.handleLogout = async () => {
             if (adminUnsubscribe) { adminUnsubscribe(); adminUnsubscribe = null; }
+            if (adminRoomsUnsubscribe) { adminRoomsUnsubscribe(); adminRoomsUnsubscribe = null; }
+            if (adminRoomStatesUnsubscribe) { adminRoomStatesUnsubscribe(); adminRoomStatesUnsubscribe = null; }
             if (musyrifUnsubscribe) { musyrifUnsubscribe(); musyrifUnsubscribe = null; }
             if (musyrifProfileUnsubscribe) { musyrifProfileUnsubscribe(); musyrifProfileUnsubscribe = null; }
+            if (roomPresenceUnsubscribe) { roomPresenceUnsubscribe(); roomPresenceUnsubscribe = null; }
 
             try {
                 const auth = getAuth(app);
@@ -1221,6 +1295,7 @@
             
             currentRole = null;
             localDevUid = null;
+            currentRoomId = null;
             localStorage.removeItem('isyrafRole');
             localStorage.removeItem('isyraf_dev_uid');
             localStorage.removeItem('isyrafUserName');
@@ -1342,10 +1417,6 @@
                     location: "Asrama PP Nurul Ilmi",
                     checklist: window.checklistState,
                     notes: window.notesState,
-                    attendance: window.attendanceState,
-                    attendanceSavedMorning: window.attendanceSavedMorning,
-                    attendanceSavedNight: window.attendanceSavedNight,
-                    santri: window.daftarSantri,
                     lastUpdate: serverTimestamp()
                 }, { merge: true });
             } catch (error) {
@@ -1410,35 +1481,41 @@
         window.addSantri = async function() {
             const nameInput = document.getElementById('newSantriName');
             const name = nameInput.value.trim();
-            if(name && !window.daftarSantri.includes(name)) {
+            if(name && !window.daftarSantri.includes(name) && currentRoomId) {
                 window.daftarSantri.push(name);
                 window.attendanceState[name] = 'H';
                 localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
                 localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
                 nameInput.value = '';
-                await saveDataToFirebase();
-                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
-                await setDoc(userRef, { santri: window.daftarSantri }, { merge: true });
+                
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
+                
                 window.forceRender = true;
                 updateAppLoop();
+            } else if (!currentRoomId) {
+                showToast("Anda belum ditugaskan ke Kamar manapun!", "error");
             }
         };
 
         window.removeSantri = async function(name) {
+            if(!currentRoomId) return;
             if(confirm(`Yakin ingin menghapus ${name} dari kamar?`)) {
                 window.daftarSantri = window.daftarSantri.filter(s => s !== name);
                 delete window.attendanceState[name];
                 localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
                 localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
-                await saveDataToFirebase();
-                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
-                await setDoc(userRef, { santri: window.daftarSantri }, { merge: true });
+                
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
+                
                 window.forceRender = true;
                 updateAppLoop();
             }
         };
 
         window.editSantri = async function(oldName) {
+            if(!currentRoomId) return;
             const newName = prompt("Ubah nama santri:", oldName);
             if (newName && newName.trim() !== "" && newName !== oldName) {
                 const cleanName = newName.trim();
@@ -1453,9 +1530,10 @@
                     delete window.attendanceState[oldName];
                     localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
                     localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
-                    await saveDataToFirebase();
-                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
-                    await setDoc(userRef, { santri: window.daftarSantri }, { merge: true });
+                    
+                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                    await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
+                    
                     window.forceRender = true;
                     updateAppLoop();
                 }
@@ -1469,6 +1547,8 @@
         };
 
         window.simpanAbsensiKeDB = async function() {
+            if(!currentRoomId) return showToast("Anda belum ditugaskan ke Kamar manapun!", "error");
+
             const btn = document.getElementById('btnSimpanAbsen');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...';
@@ -1481,37 +1561,59 @@
             });
             localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
 
+            let sm = window.attendanceSavedMorning;
+            let sn = window.attendanceSavedNight;
+
             const now = new Date();
             const mins = now.getHours() * 60 + now.getMinutes();
             if (mins >= 430 && mins <= 440) {
+                sm = true;
                 window.attendanceSavedMorning = true;
                 localStorage.setItem('isyrafAttendanceSavedMorning', 'true');
             } else if (mins >= 1290 && mins <= 1320) {
+                sn = true;
                 window.attendanceSavedNight = true;
                 localStorage.setItem('isyrafAttendanceSavedNight', 'true');
             }
 
-            await saveDataToFirebase();
-            showToast("Data absensi berhasil dikunci dan disinkronkan ke Pimpinan!", "success");
-            
-            renderAbsensiUI(); 
+            try {
+                const colName = 'room_states_' + window.getYYYYMMDD();
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', colName, currentRoomId);
+                await setDoc(roomRef, {
+                    attendance: window.attendanceState,
+                    savedMorning: sm,
+                    savedNight: sn,
+                    lastUpdate: serverTimestamp()
+                }, { merge: true });
 
-            const historyDateInput = document.getElementById('musyrifHistoryDate');
-            if (historyDateInput) {
-                historyDateInput.value = window.getYYYYMMDD();
-                window.loadMusyrifHistory(window.getYYYYMMDD());
+                showToast("Data absensi berhasil dikunci dan disinkronkan ke Pimpinan!", "success");
+                renderAbsensiUI(); 
+
+                const historyDateInput = document.getElementById('musyrifHistoryDate');
+                if (historyDateInput) {
+                    historyDateInput.value = window.getYYYYMMDD();
+                    window.loadMusyrifHistory(window.getYYYYMMDD());
+                }
+            } catch(e) {
+                console.error(e);
+                showToast("Gagal menyimpan absensi.", "error");
+            } finally {
+                if(btn) {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
             }
         };
 
         window.loadMusyrifHistory = async function(dateVal) {
-            if(!dateVal || !localDevUid) return;
+            if(!dateVal || !localDevUid || !currentRoomId) return;
             const container = document.getElementById('musyrifHistoryContainer');
             container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-4 font-bold"><i class="fas fa-circle-notch fa-spin mr-2"></i> Memuat data...</p>';
             
             try {
-                const colName = 'states_' + dateVal;
-                const userRef = doc(db, 'artifacts', appId, 'public', 'data', colName, localDevUid);
-                const docSnap = await getDoc(userRef);
+                const colName = 'room_states_' + dateVal;
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', colName, currentRoomId);
+                const docSnap = await getDoc(roomRef);
                 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -1535,10 +1637,8 @@
                         });
                         html += '</div>';
                         container.innerHTML = html;
-                    } else if (data.santri && data.santri.length > 0) {
-                        container.innerHTML = '<p class="text-[11px] text-amber-600 text-center py-4 font-bold bg-amber-50 rounded-xl border border-amber-100"><i class="fas fa-exclamation-triangle mr-1"></i> Musyrif tidak menekan tombol Simpan Absensi pada tanggal ini.</p>';
                     } else {
-                        container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-100">Tidak ada data absensi di tanggal ini.</p>';
+                        container.innerHTML = '<p class="text-[11px] text-amber-600 text-center py-4 font-bold bg-amber-50 rounded-xl border border-amber-100"><i class="fas fa-exclamation-triangle mr-1"></i> Belum ada rekaman absensi kamar pada tanggal ini.</p>';
                     }
                 } else {
                     container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-100">Belum ada rekam jejak di tanggal ini.</p>';
@@ -1553,6 +1653,12 @@
             const container = document.getElementById('absensiListContainer');
             const inputContainer = document.getElementById('absensiInputContainer');
             if(!container) return;
+
+            if(!currentRoomId) {
+                container.innerHTML = `<p class="text-[11px] text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-100">Menunggu penugasan Kamar dari Pimpinan...</p>`;
+                if(inputContainer) inputContainer.classList.add('hidden');
+                return;
+            }
 
             const now = new Date();
             const mins = now.getHours() * 60 + now.getMinutes();
@@ -1795,7 +1901,7 @@
             let html = '';
             let musyrifStats = [];
 
-            Object.values(musyrifListState).forEach(musyrif => {
+            Object.entries(musyrifListState).forEach(([musyrifId, musyrif]) => {
                 let sel = 0, ter = 0, bel = 0, totalValid = 0;
                 let totalNotes = musyrif.notes ? Object.keys(musyrif.notes).length : 0;
 
@@ -1814,6 +1920,26 @@
                 });
                 
                 const pct = totalValid > 0 ? Math.round((sel / totalValid) * 100) : 0;
+                
+                let myRoomId = null;
+                let myRoomData = null;
+                for (const [rId, rData] of Object.entries(globalRooms)) {
+                    if (rData.musyrifs && rData.musyrifs.includes(musyrifId)) {
+                        myRoomId = rId;
+                        myRoomData = rData;
+                        break;
+                    }
+                }
+
+                if (myRoomId) {
+                    musyrif.roomName = myRoomData.name;
+                    const roomState = adminRoomStates[myRoomId];
+                    musyrif.attendance = (roomState && roomState.attendance) ? roomState.attendance : {};
+                } else {
+                    musyrif.roomName = "Belum Ada Kamar";
+                    musyrif.attendance = {};
+                }
+
                 musyrifStats.push({ ...musyrif, sel, ter, bel, pct, totalNotes });
             });
 
@@ -1860,7 +1986,7 @@
                             <div class="flex items-center">
                                 <div>
                                     <h3 class="font-extrabold text-blue-950 text-[16px] flex items-center">${musyrif.name || 'Musyrif'} ${rankBadge} ${notesBadge}</h3>
-                                    <p class="text-[11px] font-bold text-slate-500 mt-1 uppercase"><i class="fas fa-map-marker-alt mr-1 text-amber-500"></i> ${musyrif.location || 'Nurul Ilmi'}</p>
+                                    <p class="text-[11px] font-bold text-slate-500 mt-1 uppercase"><i class="fas fa-map-marker-alt mr-1 text-amber-500"></i> ${musyrif.roomName}</p>
                                 </div>
                             </div>
                             <span class="bg-blue-50 text-blue-700 text-[11px] font-black px-3 py-1 rounded-xl border border-blue-100">${musyrif.pct}%</span>
@@ -1908,6 +2034,10 @@
             btnCancel.disabled = true;
 
             try {
+                const roomsSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'rooms')));
+                const roomsMap = {};
+                roomsSnap.forEach(d => roomsMap[d.id] = d.data());
+
                 let currentDate = new Date(start);
                 const endDate = new Date(end);
                 const dates = [];
@@ -1918,23 +2048,27 @@
 
                 let csvContent = "data:text/csv;charset=utf-8,";
                 if (type === 'kinerja') {
-                    csvContent += "Tanggal,Nama Musyrif,Lokasi,Kinerja (%),Tuntas (OK),Terlewat (SKIP),Jml Catatan Khusus,Jml Santri,Hadir (H),Sakit (S),Izin (I),Alpa (A)\n";
+                    csvContent += "Tanggal,Nama Musyrif,Kamar,Kinerja (%),Tuntas (OK),Terlewat (SKIP),Jml Catatan Khusus,Jml Santri,Hadir (H),Sakit (S),Izin (I),Alpa (A)\n";
                 } else {
-                    csvContent += "Tanggal,Nama Musyrif,Lokasi,Nama Santri,Status Absensi\n";
+                    csvContent += "Tanggal,Nama Kamar,Nama Santri,Status Absensi\n";
                 }
 
                 let hasData = false;
 
                 for (const dStr of dates) {
-                    const colName = 'states_' + dStr;
-                    const q = query(collection(db, 'artifacts', appId, 'public', 'data', colName));
-                    const snapshot = await getDocs(q);
-
-                    snapshot.forEach(docSnap => {
+                    const statesSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'states_' + dStr)));
+                    const roomStatesSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'room_states_' + dStr)));
+                    
+                    const roomStatesMap = {};
+                    roomStatesSnap.forEach(d => {
                         hasData = true;
-                        const musyrif = docSnap.data();
-                        
-                        if (type === 'kinerja') {
+                        roomStatesMap[d.id] = d.data();
+                    });
+
+                    if (type === 'kinerja') {
+                        statesSnap.forEach(docSnap => {
+                            hasData = true;
+                            const musyrif = docSnap.data();
                             let sel = 0, ter = 0, bel = 0, totalValid = 0;
                             let totalNotes = musyrif.notes ? Object.keys(musyrif.notes).length : 0;
                             const dateObj = new Date(dStr);
@@ -1955,9 +2089,16 @@
                             });
                             const pct = totalValid > 0 ? Math.round((sel / totalValid) * 100) : 0;
 
+                            let myRoomId = null;
+                            for(const [rId, rData] of Object.entries(roomsMap)) {
+                                if(rData.musyrifs && rData.musyrifs.includes(docSnap.id)) {
+                                    myRoomId = rId; break;
+                                }
+                            }
+
                             let hadir=0, sakit=0, izin=0, alpa=0, totalSantri=0;
-                            if (musyrif.attendance) {
-                                Object.values(musyrif.attendance).forEach(status => {
+                            if (myRoomId && roomStatesMap[myRoomId] && roomStatesMap[myRoomId].attendance) {
+                                Object.values(roomStatesMap[myRoomId].attendance).forEach(status => {
                                     totalSantri++;
                                     if(status === 'H') hadir++;
                                     else if(status === 'S') sakit++;
@@ -1965,22 +2106,27 @@
                                     else if(status === 'A') alpa++;
                                 });
                             }
-                            csvContent += `"${dStr}","${musyrif.name || 'Musyrif'}","${musyrif.location || 'Nurul Ilmi'}","${pct}%","${sel}","${ter}","${totalNotes}","${totalSantri}","${hadir}","${sakit}","${izin}","${alpa}"\n`;
-                        } 
-                        else if (type === 'absensi') {
-                            if (musyrif.attendance && Object.keys(musyrif.attendance).length > 0) {
-                                Object.entries(musyrif.attendance).forEach(([sName, status]) => {
+
+                            const roomName = myRoomId ? roomsMap[myRoomId].name : 'Belum Ada Kamar';
+                            csvContent += `"${dStr}","${musyrif.name}","${roomName}","${pct}%","${sel}","${ter}","${totalNotes}","${totalSantri}","${hadir}","${sakit}","${izin}","${alpa}"\n`;
+                        });
+                    } 
+                    else if (type === 'absensi') {
+                        for(const [rId, rState] of Object.entries(roomStatesMap)) {
+                            if (rState.attendance) {
+                                const roomName = roomsMap[rId] ? roomsMap[rId].name : 'Kamar Tidak Diketahui';
+                                Object.entries(rState.attendance).forEach(([sName, status]) => {
                                     let statusFull = status;
                                     if(status === 'H') statusFull = 'Hadir';
                                     if(status === 'S') statusFull = 'Sakit';
                                     if(status === 'I') statusFull = 'Izin';
                                     if(status === 'A') statusFull = 'Alpa';
                                     
-                                    csvContent += `"${dStr}","${musyrif.name || 'Musyrif'}","${musyrif.location || 'Nurul Ilmi'}","${sName}","${statusFull}"\n`;
+                                    csvContent += `"${dStr}","${roomName}","${sName}","${statusFull}"\n`;
                                 });
                             }
                         }
-                    });
+                    }
                 }
 
                 if(!hasData) {
