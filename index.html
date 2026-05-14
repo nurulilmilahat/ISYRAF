@@ -567,10 +567,10 @@
             const auth = getAuth(app);
 
             try {
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', 'admin@isyraf.com'));
+                const q = query(collection(db, 'whitelist'), where('email', '==', 'admin@isyraf.com'));
                 const adminSnap = await getDocs(q);
                 if(adminSnap.empty) {
-                    const adminRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist')); 
+                    const adminRef = doc(collection(db, 'whitelist')); 
                     await setDoc(adminRef, { email: 'admin@isyraf.com', role: 'admin', name: 'Pimpinan Default' });
                 }
             } catch(e) { console.warn("Seed admin error:", e); }
@@ -596,7 +596,7 @@
                                 syncUserPresence();
                             }
                         } else {
-                            const qWhitelist = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', user.email));
+                            const qWhitelist = query(collection(db, 'whitelist'), where('email', '==', user.email));
                             const wSnap = await getDocs(qWhitelist);
                             
                             if (!wSnap.empty) {
@@ -657,7 +657,7 @@
             btn.disabled = true;
 
             try {
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', email));
+                const q = query(collection(db, 'whitelist'), where('email', '==', email));
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
@@ -767,13 +767,13 @@
             btn.disabled = true;
 
             try {
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), where('email', '==', email));
+                const q = query(collection(db, 'whitelist'), where('email', '==', email));
                 const querySnapshot = await getDocs(q);
                 
                 if(!querySnapshot.empty) {
                     showToast("Email ini sudah ada di whitelist!", "error");
                 } else {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'), { 
+                    await addDoc(collection(db, 'whitelist'), { 
                         email: email, 
                         name: name, 
                         role: 'musyrif' 
