@@ -542,6 +542,7 @@
         window.attendanceSavedNight = localStorage.getItem('isyrafAttendanceSavedNight') === 'true'; 
 
         window.activeEditors = new Set();
+        window.activeKeterangan = new Set();
         window.forceRender = true;
         window.lastRenderTime = null;
         window.notifiedTasks = new Set(JSON.parse(localStorage.getItem('isyrafNotified')) || []);
@@ -1449,6 +1450,22 @@
             updateAppLoop();
         };
 
+        window.toggleKeterangan = function(taskId) {
+            const el = document.getElementById('ket-content-' + taskId);
+            const icon = document.getElementById('icon-ket-' + taskId);
+            if (el) {
+                if (el.classList.contains('hidden')) {
+                    el.classList.remove('hidden');
+                    window.activeKeterangan.add(taskId);
+                    if(icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); }
+                } else {
+                    el.classList.add('hidden');
+                    window.activeKeterangan.delete(taskId);
+                    if(icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); }
+                }
+            }
+        };
+
         window.toggleNoteEditor = function(taskId) {
             const editor = document.getElementById(`note-editor-${taskId}`);
             if (editor.classList.contains('hidden')) {
@@ -1826,7 +1843,18 @@
                     bCls = 'border-l-[6px] border-l-amber-500';
                 }
 
-                let extraContentHTML = (isNow && task.keterangan) ? `<div class="mt-3 text-[12.5px] font-semibold text-blue-800/80 bg-blue-100/40 p-3 rounded-2xl leading-relaxed border border-blue-200/50">${task.keterangan}</div>` : '';
+                let extraContentHTML = '';
+                
+                if (task.keterangan) {
+                    const isKetOpen = window.activeKeterangan.has(task.id);
+                    const ketHidden = isKetOpen ? '' : 'hidden';
+                    const ketBg = isNow ? 'bg-blue-100/40 border-blue-200/50 text-blue-800/80' : 'bg-slate-50/80 border-slate-200/60 text-slate-600';
+                    
+                    extraContentHTML += `
+                    <div id="ket-content-${task.id}" class="${ketHidden} mt-2 text-[12.5px] font-semibold ${ketBg} p-3 rounded-2xl leading-relaxed border">
+                        ${task.keterangan}
+                    </div>`;
+                }
                 
                 if (noteText) {
                     extraContentHTML += `
@@ -1849,6 +1877,13 @@
 
                 const pencilBtn = (!isFut) ? `<button onclick="toggleNoteEditor(${task.id})" class="text-slate-400 hover:text-amber-500 transition px-2 py-1 rounded-full hover:bg-slate-100" title="Catatan Kejadian"><i class="fas fa-pencil-alt text-[13px]"></i></button>` : '';
 
+                const titleLine = task.keterangan 
+                    ? `<div class="flex items-center justify-between cursor-pointer group" onclick="toggleKeterangan(${task.id})">
+                           <div class="font-bold text-[15px] leading-tight ${tCls}">${task.title}</div>
+                           <i id="icon-ket-${task.id}" class="fas ${window.activeKeterangan.has(task.id) ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-300 group-hover:text-blue-500 transition-colors text-[12px] ml-2 p-1"></i>
+                       </div>`
+                    : `<div class="font-bold text-[15px] leading-tight ${tCls}">${task.title}</div>`;
+
                 html += `
                     <div class="flex items-start p-4 rounded-[2rem] transition-all ${sCls} ${bCls} mb-4">
                         <div class="flex-1 pr-2 w-full overflow-hidden">
@@ -1858,7 +1893,7 @@
                                 </div>
                                 ${pencilBtn}
                             </div>
-                            <div class="font-bold text-[15px] leading-tight ${tCls}">${task.title}</div>
+                            ${titleLine}
                             ${extraContentHTML}
                         </div>
                         <div class="ml-2 pl-4 border-l border-slate-200/50 flex items-center justify-center min-w-[50px] self-stretch">${iHTML}</div>
@@ -1982,7 +2017,9 @@
                 let detailHtml = '<div class="space-y-1.5 mt-3 max-h-60 overflow-y-auto no-scrollbar pr-1">';
                 scheduleHariIni.forEach(t => {
                     if (t.noCheck || (t.noCheckOn && t.noCheckOn.includes(day))) return;
-                    const isChecked = musyrif.checklist && musyrif.checklist[t.id];
+                    const checkValue = musyrif.checklist && musyrif.checklist[t.id];
+                    const isChecked = !!checkValue;
+                    const noteText = musyrif.notes && musyrif.notes[t.id];
                     let isPas = true;
                     if(isToday) {
                         const cp = window.getCheckpointWindow(t.start, t.end);
@@ -1993,7 +2030,8 @@
                     let bgCls = '';
                     if (isChecked) {
                         bgCls = 'bg-emerald-50 border-emerald-100';
-                        statusHtml = '<span class="text-[9px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-lg"><i class="fas fa-check"></i> OK</span>';
+                        const timeBadge = typeof checkValue === 'string' ? ` <span class="opacity-80 ml-1.5"><i class="far fa-clock"></i> ${checkValue}</span>` : '';
+                        statusHtml = `<span class="text-[9px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-lg flex items-center"><i class="fas fa-check mr-1"></i> OK${timeBadge}</span>`;
                     } else if (isPas) {
                         bgCls = 'bg-rose-50 border-rose-100';
                         statusHtml = '<span class="text-[9px] font-black text-rose-600 bg-rose-100 px-2 py-0.5 rounded-lg"><i class="fas fa-times"></i> SKIP</span>';
@@ -2002,13 +2040,24 @@
                         statusHtml = '<span class="text-[9px] font-black text-slate-500 bg-slate-200 px-2 py-0.5 rounded-lg"><i class="fas fa-clock"></i> WAIT</span>';
                     }
 
+                    let noteHtml = '';
+                    if (noteText) {
+                        noteHtml = `
+                        <div class="mt-2 text-[10px] font-semibold text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200/60 flex items-start">
+                            <i class="fas fa-thumbtack mt-0.5 mr-2 text-amber-500"></i> <span class="whitespace-pre-wrap">${noteText}</span>
+                        </div>`;
+                    }
+
                     detailHtml += `
-                    <div class="flex justify-between items-center p-2 rounded-xl border ${bgCls}">
-                        <div class="truncate pr-2">
-                            <div class="text-[9px] font-extrabold text-slate-500">${t.start} - ${t.end}</div>
-                            <div class="text-[10px] font-bold text-slate-700 truncate">${t.title}</div>
+                    <div class="flex flex-col p-2 rounded-xl border ${bgCls}">
+                        <div class="flex justify-between items-center w-full">
+                            <div class="truncate pr-2">
+                                <div class="text-[9px] font-extrabold text-slate-500">${t.start} - ${t.end}</div>
+                                <div class="text-[10px] font-bold text-slate-700 truncate">${t.title}</div>
+                            </div>
+                            ${statusHtml}
                         </div>
-                        ${statusHtml}
+                        ${noteHtml}
                     </div>`;
                 });
                 detailHtml += '</div>';
