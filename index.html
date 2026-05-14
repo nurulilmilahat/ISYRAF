@@ -381,6 +381,26 @@
         </header>
 
         <main class="max-w-md mx-auto p-5 animate-fade-in pb-10">
+            <!-- DISTRIBUSI SANTRI -->
+            <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
+                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Distribusi Santri (Per Musyrif)</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Pilih Musyrif</label>
+                        <select id="adminMusyrifSelect" onchange="loadMusyrifSantri(this.value)" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="">-- Memuat Musyrif --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Daftar Santri (Pisahkan dengan Enter)</label>
+                        <textarea id="adminSantriInput" rows="4" placeholder="Ahmad Fauzi&#10;Budi Santoso&#10;Hasan Basri" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+                    </div>
+                    <button onclick="saveMusyrifSantri()" id="btnSaveSantriDist" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center text-[12px]">
+                        <i class="fas fa-save mr-2"></i> Simpan Daftar Santri
+                    </button>
+                </div>
+            </div>
+
             <!-- DASBOR GRAFIK TREN KINERJA -->
             <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
                 <div class="flex justify-between items-center mb-4">
@@ -503,8 +523,9 @@
         window.adminSelectedDate = window.getYYYYMMDD();
         let adminUnsubscribe = null;
         let musyrifUnsubscribe = null;
+        let musyrifProfileUnsubscribe = null;
 
-        window.daftarSantri = JSON.parse(localStorage.getItem('isyrafSantri')) || ["Ahmad Fauzi", "Budi Santoso", "Hasan Basri", "Zaid bin Tsabit", "Umar Al-Faruq", "Ali Zainal"];
+        window.daftarSantri = JSON.parse(localStorage.getItem('isyrafSantri')) || [];
         window.checklistState = JSON.parse(localStorage.getItem('isyrafState')) || {};
         window.notesState = JSON.parse(localStorage.getItem('isyrafNotes')) || {};
         window.attendanceState = JSON.parse(localStorage.getItem('isyrafAttendance')) || {};
@@ -778,6 +799,92 @@
                 btn.disabled = false;
             }
         };
+
+        window.loadAdminSantriManager = async function() {
+            const select = document.getElementById('adminMusyrifSelect');
+            if(!select) return;
+            select.innerHTML = '<option value="">Memuat data...</option>';
+            try {
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), where('role', '==', 'musyrif'));
+                const snap = await getDocs(q);
+                let html = '<option value="">-- Pilih Musyrif --</option>';
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    html += `<option value="${doc.id}">${data.name} (${data.email})</option>`;
+                });
+                select.innerHTML = html;
+            } catch(e) {
+                console.error("Error loading musyrifs:", e);
+                select.innerHTML = '<option value="">Gagal memuat</option>';
+            }
+        };
+
+        window.loadMusyrifSantri = async function(uid) {
+            const textarea = document.getElementById('adminSantriInput');
+            textarea.value = '';
+            if(!uid) return;
+            try {
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', uid);
+                const docSnap = await getDoc(userRef);
+                if(docSnap.exists()) {
+                    const data = docSnap.data();
+                    if(data.santri && Array.isArray(data.santri)) {
+                        textarea.value = data.santri.join('\n');
+                    }
+                }
+            } catch(e) {
+                console.error("Error loading santri:", e);
+                showToast("Gagal memuat daftar santri", "error");
+            }
+        };
+
+        window.saveMusyrifSantri = async function() {
+            const uid = document.getElementById('adminMusyrifSelect').value;
+            const textarea = document.getElementById('adminSantriInput');
+            if(!uid) return showToast("Pilih Musyrif terlebih dahulu!", "error");
+            
+            const btn = document.getElementById('btnSaveSantriDist');
+            const oriText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...';
+            btn.disabled = true;
+
+            const santriArr = textarea.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            
+            try {
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', uid);
+                await setDoc(userRef, { santri: santriArr }, { merge: true });
+                showToast("Daftar santri berhasil disimpan ke profil Musyrif!", "success");
+            } catch(e) {
+                console.error("Error saving santri:", e);
+                showToast("Gagal menyimpan daftar santri", "error");
+            } finally {
+                btn.innerHTML = oriText;
+                btn.disabled = false;
+            }
+        };
+
+        function syncUserProfile() {
+            if(!localDevUid || currentRole !== 'musyrif') return;
+            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
+            if (musyrifProfileUnsubscribe) musyrifProfileUnsubscribe();
+            musyrifProfileUnsubscribe = onSnapshot(userRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    if (data.santri && Array.isArray(data.santri)) {
+                        window.daftarSantri = data.santri;
+                        localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
+                        window.daftarSantri.forEach(name => {
+                            if (!window.attendanceState[name]) {
+                                window.attendanceState[name] = 'H';
+                            }
+                        });
+                        localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+                        window.forceRender = true;
+                        updateAppLoop();
+                    }
+                }
+            });
+        }
 
         window.loadChartData = async function(days) {
             const chartLoading = document.getElementById('chartLoading');
@@ -1089,11 +1196,13 @@
             if(currentRole === 'musyrif') {
                 target = 'screen-musyrif';
                 document.getElementById('musyrifNameDisplay').innerText = localStorage.getItem('isyrafUserName') || 'Musyrif';
+                syncUserProfile();
             } else if(currentRole === 'admin') {
                 target = 'screen-admin';
                 document.getElementById('adminDateSelector').value = window.adminSelectedDate;
                 setupAdminListener();
                 setTimeout(() => window.loadChartData(7), 800); 
+                window.loadAdminSantriManager();
             }
             
             triggerLoading(target);
@@ -1103,6 +1212,7 @@
         window.handleLogout = async () => {
             if (adminUnsubscribe) { adminUnsubscribe(); adminUnsubscribe = null; }
             if (musyrifUnsubscribe) { musyrifUnsubscribe(); musyrifUnsubscribe = null; }
+            if (musyrifProfileUnsubscribe) { musyrifProfileUnsubscribe(); musyrifProfileUnsubscribe = null; }
 
             try {
                 const auth = getAuth(app);
@@ -1307,6 +1417,8 @@
                 localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
                 nameInput.value = '';
                 await saveDataToFirebase();
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
+                await setDoc(userRef, { santri: window.daftarSantri }, { merge: true });
                 window.forceRender = true;
                 updateAppLoop();
             }
@@ -1319,6 +1431,8 @@
                 localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
                 localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
                 await saveDataToFirebase();
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
+                await setDoc(userRef, { santri: window.daftarSantri }, { merge: true });
                 window.forceRender = true;
                 updateAppLoop();
             }
@@ -1340,6 +1454,8 @@
                     localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
                     localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
                     await saveDataToFirebase();
+                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', localDevUid);
+                    await setDoc(userRef, { santri: window.daftarSantri }, { merge: true });
                     window.forceRender = true;
                     updateAppLoop();
                 }
