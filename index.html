@@ -408,6 +408,35 @@
                 </div>
             </div>
 
+            <!-- PENGATURAN SOP & CEKLIS (HYBRID SYSTEM) -->
+            <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
+                <div class="flex justify-between items-center mb-4 cursor-pointer" onclick="toggleAdminSop()">
+                    <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-edit mr-2 text-blue-500"></i> Edit SOP & Judul Ceklis</h3>
+                    <i id="icon-sop-toggle" class="fas fa-chevron-down text-slate-400"></i>
+                </div>
+                <div id="adminSopContainer" class="hidden space-y-4">
+                    <p class="text-[10px] text-slate-500 mb-2 leading-relaxed">Pilih kegiatan untuk mengedit Judul dan Keterangan (SOP). <br><span class="text-amber-600 font-bold">Penting: Waktu pelaksanaan dikunci oleh sistem (mengikuti algoritma salat) agar jadwal tidak rusak.</span></p>
+                    <div class="mb-3">
+                        <select id="adminSopSelect" onchange="loadSopForm(this.value)" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="">-- Pilih Kegiatan --</option>
+                        </select>
+                    </div>
+                    <div id="adminSopForm" class="hidden space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Judul Kegiatan</label>
+                            <input type="text" id="adminSopTitle" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Keterangan / SOP</label>
+                            <textarea id="adminSopDesc" rows="4" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+                        </div>
+                        <button onclick="saveSopData()" id="btnSaveSop" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center text-[12px]">
+                            <i class="fas fa-save mr-2"></i> Simpan SOP
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- DASBOR GRAFIK TREN KINERJA -->
             <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
                 <div class="flex justify-between items-center mb-4">
@@ -533,7 +562,9 @@
         let musyrifUnsubscribe = null;
         let musyrifProfileUnsubscribe = null;
         let roomPresenceUnsubscribe = null;
+        let customChecklistUnsubscribe = null;
 
+        window.customChecklistConfig = {};
         window.daftarSantri = JSON.parse(localStorage.getItem('isyrafSantri')) || [];
         window.checklistState = JSON.parse(localStorage.getItem('isyrafState')) || {};
         window.notesState = JSON.parse(localStorage.getItem('isyrafNotes')) || {};
@@ -563,6 +594,23 @@
             
             setTimeout(() => { toast.classList.add('opacity-0', '-translate-y-4'); }, 6000);
         };
+
+        function syncCustomChecklist() {
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'checklist_customizations');
+            if (customChecklistUnsubscribe) customChecklistUnsubscribe();
+            customChecklistUnsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    window.customChecklistConfig = docSnap.data();
+                } else {
+                    window.customChecklistConfig = {};
+                }
+                
+                const todayObj = new Date();
+                globalJadwal = generateSchedule(globalPrayers, todayObj.getDay());
+                window.forceRender = true;
+                updateAppLoop();
+            });
+        }
 
         const initFirebase = async () => {
             const auth = getAuth(app);
@@ -893,6 +941,88 @@
             } catch(e) {
                 console.error("Error saving room:", e);
                 showToast("Gagal menyimpan data kamar", "error");
+            } finally {
+                btn.innerHTML = oriText;
+                btn.disabled = false;
+            }
+        };
+
+        window.toggleAdminSop = function() {
+            const container = document.getElementById('adminSopContainer');
+            const icon = document.getElementById('icon-sop-toggle');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                window.loadSopSelectOptions();
+            } else {
+                container.classList.add('hidden');
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        };
+
+        window.loadSopSelectOptions = function() {
+            const select = document.getElementById('adminSopSelect');
+            if(!select) return;
+            
+            const sched0 = generateSchedule(globalPrayers, 0);
+            const sched6 = generateSchedule(globalPrayers, 6);
+            const sched1 = generateSchedule(globalPrayers, 1);
+            
+            const allTasksMap = new Map();
+            [...sched0, ...sched6, ...sched1].forEach(t => allTasksMap.set(t.id, t));
+            
+            const sortedTasks = Array.from(allTasksMap.values()).sort((a,b) => a.id - b.id);
+            window.masterTasksList = sortedTasks;
+            
+            let html = '<option value="">-- Pilih Kegiatan --</option>';
+            sortedTasks.forEach(t => {
+                html += `<option value="${t.id}">[${t.start}] ${t.title}</option>`;
+            });
+            select.innerHTML = html;
+        };
+
+        window.loadSopForm = function(taskIdStr) {
+            const form = document.getElementById('adminSopForm');
+            if(!taskIdStr) {
+                form.classList.add('hidden');
+                return;
+            }
+            const taskId = parseInt(taskIdStr);
+            const task = window.masterTasksList.find(t => t.id === taskId);
+            
+            if(task) {
+                document.getElementById('adminSopTitle').value = task.title;
+                document.getElementById('adminSopDesc').value = task.keterangan || '';
+                form.classList.remove('hidden');
+            }
+        };
+
+        window.saveSopData = async function() {
+            const select = document.getElementById('adminSopSelect');
+            const taskIdStr = select.value;
+            if(!taskIdStr) return showToast("Pilih kegiatan terlebih dahulu!", "error");
+            
+            const taskId = parseInt(taskIdStr);
+            const newTitle = document.getElementById('adminSopTitle').value.trim();
+            const newDesc = document.getElementById('adminSopDesc').value.trim();
+            
+            if(!newTitle) return showToast("Judul kegiatan wajib diisi!", "error");
+            
+            const btn = document.getElementById('btnSaveSop');
+            const oriText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...';
+            btn.disabled = true;
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'checklist_customizations');
+                const updateData = {};
+                updateData[taskId] = { title: newTitle, keterangan: newDesc };
+                await setDoc(docRef, updateData, { merge: true });
+                
+                showToast("SOP berhasil diperbarui!", "success");
+            } catch(e) {
+                console.error("Error saving SOP:", e);
+                showToast("Gagal menyimpan SOP", "error");
             } finally {
                 btn.innerHTML = oriText;
                 btn.disabled = false;
@@ -1235,7 +1365,18 @@
                 { id: 23, start: '22:00', end: '23:59', title: 'Istirahat Malam (Tidur)', keterangan: 'Lampu padam, pintu dikunci.', noCheck: true }
             );
 
-            return schedule.sort((a, b) => a.start.localeCompare(b.start));
+            const finalSchedule = schedule.sort((a, b) => a.start.localeCompare(b.start));
+            
+            return finalSchedule.map(task => {
+                if (window.customChecklistConfig && window.customChecklistConfig[task.id]) {
+                    return {
+                        ...task,
+                        title: window.customChecklistConfig[task.id].title || task.title,
+                        keterangan: window.customChecklistConfig[task.id].keterangan !== undefined ? window.customChecklistConfig[task.id].keterangan : task.keterangan
+                    };
+                }
+                return task;
+            });
         };
 
         async function loadDynamicSchedule() {
@@ -1263,6 +1404,7 @@
 
         const initApp = async () => {
             await loadDynamicSchedule();
+            syncCustomChecklist();
             updateAppLoop();
             
             let target = 'screen-login';
@@ -1288,6 +1430,7 @@
             if (musyrifUnsubscribe) { musyrifUnsubscribe(); musyrifUnsubscribe = null; }
             if (musyrifProfileUnsubscribe) { musyrifProfileUnsubscribe(); musyrifProfileUnsubscribe = null; }
             if (roomPresenceUnsubscribe) { roomPresenceUnsubscribe(); roomPresenceUnsubscribe = null; }
+            if (customChecklistUnsubscribe) { customChecklistUnsubscribe(); customChecklistUnsubscribe = null; }
 
             try {
                 const auth = getAuth(app);
