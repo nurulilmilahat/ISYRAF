@@ -513,6 +513,11 @@
         let currentRole = localStorage.getItem('isyrafRole') || null;
         let currentRoomId = null;
 
+        // Menyimpan tombol login yang dipilih sampai profil Firestore selesai divalidasi.
+        // Ini mencegah race condition: processLogin tidak lagi membaca profil lalu signOut
+        // sebelum onAuthStateChanged sempat memulihkan profil dari whitelist.
+        let pendingLoginRole = null;
+
         let globalJadwal = [];
         let globalPrayers = {};
         let musyrifListState = {}; 
@@ -632,69 +637,91 @@
             } catch(e) { console.warn("Seed admin error:", e); }
 
             onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    try {
-                        const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
-                        const docSnap = await getDoc(userRef);
-                        
-                        if (docSnap.exists()) {
-                            const userData = docSnap.data();
-                            localStorage.setItem('isyrafRole', userData.role);
-                            localStorage.setItem('isyraf_dev_uid', user.uid);
-                            localStorage.setItem('isyrafUserName', userData.name);
-                            
-                            currentRole = userData.role;
-                            localDevUid = user.uid;
-                            
-                            initApp();
-                            if (currentRole === 'musyrif') {
-                                syncUserProfile();
-                                syncUserPresence();
-                            }
-                        } else {
-                            const qWhitelist = query(collection(db, 'whitelist'), where('email', '==', user.email));
-                            const wSnap = await getDocs(qWhitelist);
-                            
-                            if (!wSnap.empty) {
-                                const wData = wSnap.docs[0].data();
-                                const newProfile = {
-                                    uid: user.uid,
-                                    email: user.email,
-                                    role: wData.role || 'musyrif',
-                                    name: wData.name || user.email.split('@')[0]
-                                };
-                                await setDoc(userRef, newProfile);
-                                
-                                localStorage.setItem('isyrafRole', newProfile.role);
-                                localStorage.setItem('isyraf_dev_uid', user.uid);
-                                localStorage.setItem('isyrafUserName', newProfile.name);
-                                
-                                currentRole = newProfile.role;
-                                localDevUid = user.uid;
-                                
-                                showToast("Pemulihan profil otomatis berhasil!", "success");
-                        
-                                initApp();
-                                if (currentRole === 'musyrif') {
-                                    syncUserProfile();
-                                    syncUserPresence();
-                                }
-                            } else {
-                                showToast("Profil tidak ditemukan dan tidak ada di whitelist.", "error");
-                                handleLogout();
-                            }
-                        }
-                    } catch (error) {
-                        console.error("Gagal memuat profil:", error);
-                        if (error.code === 'permission-denied') {
-                            showToast("Akses Ditolak: Periksa Security Rules Firestore Anda!", "error");
-                        } else {
-                            showToast("Gagal memuat profil sistem.", "error");
-                        }
-                        handleLogout();
-                    }
-                } else {
+                if (!user) {
                     triggerLoading('screen-login');
+                    return;
+                }
+
+                try {
+                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+                    let docSnap = await getDoc(userRef);
+                    let userData;
+                    let profileRecovered = false;
+
+                    // Jika akun sudah ada di Authentication tetapi profil Firestore belum ada,
+                    // pulihkan otomatis dari whitelist.
+                    if (docSnap.exists()) {
+                        userData = docSnap.data();
+                    } else {
+                        const qWhitelist = query(
+                            collection(db, 'whitelist'),
+                            where('email', '==', (user.email || '').toLowerCase())
+                        );
+                        const wSnap = await getDocs(qWhitelist);
+
+                        if (wSnap.empty) {
+                            pendingLoginRole = null;
+                            showToast("Profil tidak ditemukan dan email tidak ada di whitelist.", "error");
+                            await signOut(auth);
+                            return;
+                        }
+
+                        const wData = wSnap.docs[0].data();
+                        userData = {
+                            uid: user.uid,
+                            email: (user.email || wData.email || '').toLowerCase(),
+                            role: wData.role || 'musyrif',
+                            name: wData.name || (user.email ? user.email.split('@')[0] : 'Pengguna')
+                        };
+
+                        await setDoc(userRef, userData, { merge: true });
+                        profileRecovered = true;
+                    }
+
+                    // Validasi tombol yang dipilih (Musyrif/Pimpinan) dilakukan DI SINI,
+                    // setelah profil tersedia. processLogin tidak boleh signOut lebih dulu.
+                    if (pendingLoginRole && userData.role !== pendingLoginRole) {
+                        const attemptedRole = pendingLoginRole;
+                        pendingLoginRole = null;
+                        await signOut(auth);
+                        showToast(
+                            `Akses Ditolak! Akun ini terdaftar sebagai ${userData.role === 'admin' ? 'Pimpinan' : 'Musyrif'}, bukan ${attemptedRole === 'admin' ? 'Pimpinan' : 'Musyrif'}.`,
+                            "error"
+                        );
+                        return;
+                    }
+
+                    pendingLoginRole = null;
+
+                    localStorage.setItem('isyrafRole', userData.role);
+                    localStorage.setItem('isyraf_dev_uid', user.uid);
+                    localStorage.setItem('isyrafUserName', userData.name);
+
+                    currentRole = userData.role;
+                    localDevUid = user.uid;
+
+                    if (profileRecovered) {
+                        showToast("Profil akun berhasil dipulihkan otomatis.", "success");
+                    } else {
+                        showToast("Login berhasil!", "success");
+                    }
+
+                    initApp();
+                    if (currentRole === 'musyrif') {
+                        syncUserProfile();
+                        syncUserPresence();
+                    }
+                } catch (error) {
+                    console.error("Gagal memuat/memulihkan profil:", error);
+                    pendingLoginRole = null;
+
+                    if (error.code === 'permission-denied') {
+                        showToast("Akses Firestore ditolak. Pastikan rules sudah Publish dan request.auth aktif.", "error");
+                    } else {
+                        showToast("Gagal memuat profil sistem: " + (error.message || 'Kesalahan tidak diketahui'), "error");
+                    }
+
+                    try { await signOut(auth); } catch (_) {}
                 }
             });
         };
@@ -742,7 +769,7 @@
             } catch (error) {
                 console.error("Register Error:", error);
                 if(error.code === 'auth/email-already-in-use') {
-                    showToast("Email sudah terdaftar. Silakan login.", "error");
+                    showToast("Email sudah ada di Authentication. Silakan kembali ke Login; profil Firestore akan dipulihkan otomatis bila diperlukan.", "error");
                 } else {
                     showToast("Gagal registrasi: " + error.message, "error");
                 }
@@ -755,38 +782,39 @@
         window.processLogin = async function(attemptedRole) {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value.trim();
-            
+
             if(!email || !password) return showToast("Email dan Password wajib diisi!", "error");
-            
+
             const btn = attemptedRole === 'admin' ? document.getElementById('btnMasukAdmin') : document.getElementById('btnMasukMusyrif');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mb-1.5 text-lg"></i>Masuk...';
-            
+
             document.getElementById('btnMasukAdmin').disabled = true;
             document.getElementById('btnMasukMusyrif').disabled = true;
 
+            // Simpan role yang dipilih. Pemeriksaan role dilakukan oleh onAuthStateChanged
+            // SETELAH profil Firestore ditemukan atau dipulihkan dari whitelist.
+            pendingLoginRole = attemptedRole;
+
             try {
                 const auth = getAuth(app);
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                
-                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', userCredential.user.uid);
-                const docSnap = await getDoc(userRef);
-                
-                if (docSnap.exists()) {
-                    const actualRole = docSnap.data().role;
-                    if (actualRole !== attemptedRole) {
-                        await signOut(auth);
-                        showToast(`Akses Ditolak! Akun ini bukan terdaftar sebagai ${attemptedRole === 'admin' ? 'Pimpinan' : 'Musyrif'}.`, "error");
-                    } else {
-                        showToast("Login Berhasil!", "success");
-                    }
-                } else {
-                    await signOut(auth);
-                    showToast("Data profil tidak ditemukan.", "error");
-                }
+
+                // Hanya autentikasi di sini. JANGAN getDoc()/signOut() di processLogin,
+                // karena itu yang sebelumnya menyebabkan race condition pada akun baru.
+                await signInWithEmailAndPassword(auth, email, password);
             } catch (error) {
                 console.error("Login Error:", error);
-                showToast("Email atau Password salah!", "error");
+                pendingLoginRole = null;
+
+                if (error.code === 'auth/invalid-credential' ||
+                    error.code === 'auth/wrong-password' ||
+                    error.code === 'auth/user-not-found') {
+                    showToast("Email atau Password salah!", "error");
+                } else if (error.code === 'auth/too-many-requests') {
+                    showToast("Terlalu banyak percobaan login. Silakan coba lagi beberapa saat.", "error");
+                } else {
+                    showToast("Gagal login: " + (error.message || 'Kesalahan tidak diketahui'), "error");
+                }
             } finally {
                 btn.innerHTML = originalText;
                 document.getElementById('btnMasukAdmin').disabled = false;
