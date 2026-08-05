@@ -492,7 +492,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, serverTimestamp, getDocs, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, where, serverTimestamp, getDocs, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -876,6 +876,76 @@
             }
         };
 
+        // Mengeluarkan musyrif dari aplikasi tanpa mengganggu fitur lain.
+        // Yang dihapus: profil users, whitelist, dan penugasan musyrif pada semua kamar.
+        // Akun Firebase Authentication tidak dapat dihapus dari browser client; jika ingin
+        // menghapus permanen dari Authentication, lakukan dari Firebase Console / backend Admin SDK.
+        window.hapusMusyrif = async function(uid) {
+            if (currentRole !== 'admin') {
+                return showToast("Hanya Pimpinan yang dapat menghapus musyrif.", "error");
+            }
+
+            const musyrif = (window.adminAllMusyrifs || []).find(m => m.id === uid);
+            if (!musyrif) {
+                await window.loadAdminSantriManager();
+                return showToast("Data musyrif sudah tidak ditemukan. Daftar telah diperbarui.", "success");
+            }
+
+            const nama = musyrif.name || musyrif.email || 'Musyrif';
+            const email = (musyrif.email || '').toLowerCase();
+            const yakin = confirm(
+                `Keluarkan ${nama} dari aplikasi?\n\n` +
+                `Tindakan ini akan menghapus profil aplikasi, whitelist, dan penugasannya dari semua kamar. ` +
+                `Data Authentication Firebase tidak ikut terhapus.`
+            );
+            if (!yakin) return;
+
+            try {
+                // 1) Lepaskan UID musyrif dari semua kamar.
+                const roomsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
+                const roomUpdates = [];
+                roomsSnap.forEach(roomDoc => {
+                    const roomData = roomDoc.data();
+                    const assigned = Array.isArray(roomData.musyrifs) ? roomData.musyrifs : [];
+                    if (assigned.includes(uid)) {
+                        roomUpdates.push(
+                            setDoc(roomDoc.ref, { musyrifs: assigned.filter(id => id !== uid) }, { merge: true })
+                        );
+                    }
+                });
+
+                // 2) Hapus seluruh dokumen whitelist dengan email yang sama.
+                const whitelistDeletes = [];
+                if (email) {
+                    const wSnap = await getDocs(query(collection(db, 'whitelist'), where('email', '==', email)));
+                    wSnap.forEach(wDoc => whitelistDeletes.push(deleteDoc(wDoc.ref)));
+                }
+
+                // 3) Hapus profil aplikasi users/{uid}.
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', uid);
+
+                await Promise.all([
+                    ...roomUpdates,
+                    ...whitelistDeletes,
+                    deleteDoc(userRef)
+                ]);
+
+                // Pertahankan kamar yang sedang dipilih, lalu muat ulang daftar agar nama langsung hilang.
+                const selectedRoom = document.getElementById('adminRoomSelect')?.value || '';
+                await window.loadAdminSantriManager();
+                if (selectedRoom && window.adminAllRooms && window.adminAllRooms[selectedRoom]) {
+                    const roomSelect = document.getElementById('adminRoomSelect');
+                    if (roomSelect) roomSelect.value = selectedRoom;
+                    window.loadRoomData(selectedRoom);
+                }
+
+                showToast(`${nama} berhasil dikeluarkan dari aplikasi.`, "success");
+            } catch (e) {
+                console.error("Error deleting musyrif:", e);
+                showToast("Gagal menghapus musyrif. Periksa koneksi atau Security Rules.", "error");
+            }
+        };
+
         window.loadAdminSantriManager = async function() {
             const selectRoom = document.getElementById('adminRoomSelect');
             const containerMusyrifs = document.getElementById('adminRoomMusyrifs');
@@ -890,10 +960,15 @@
                 snapM.forEach(doc => {
                     const data = doc.data();
                     window.adminAllMusyrifs.push({ id: doc.id, ...data });
-                    htmlM += `<label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 rounded-lg cursor-pointer">
-                                <input type="checkbox" name="roomMusyrifCb" value="${doc.id}" class="w-4 h-4 text-blue-600 rounded border-slate-300">
-                                <span class="text-[11px] font-bold text-slate-700">${data.name} <span class="opacity-50 font-normal">(${data.email})</span></span>
-                              </label>`;
+                    htmlM += `<div class="flex items-center gap-2 p-1.5 hover:bg-slate-100 rounded-lg">
+                                <label class="flex items-center space-x-2 flex-1 min-w-0 cursor-pointer">
+                                    <input type="checkbox" name="roomMusyrifCb" value="${doc.id}" class="w-4 h-4 text-blue-600 rounded border-slate-300 shrink-0">
+                                    <span class="text-[11px] font-bold text-slate-700 truncate">${data.name} <span class="opacity-50 font-normal">(${data.email})</span></span>
+                                </label>
+                                <button type="button" onclick="hapusMusyrif('${doc.id}')" class="shrink-0 w-7 h-7 rounded-lg text-rose-500 hover:text-white hover:bg-rose-500 transition flex items-center justify-center" title="Keluarkan musyrif">
+                                    <i class="fas fa-trash-alt text-[10px]"></i>
+                                </button>
+                              </div>`;
                 });
                 containerMusyrifs.innerHTML = htmlM || '<div class="text-[11px] text-slate-500">Belum ada musyrif</div>';
 
