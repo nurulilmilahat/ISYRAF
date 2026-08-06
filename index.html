@@ -104,10 +104,44 @@
             line-height: 1.25;
         }
 
+        /* === AUDIT LOG & STATUS ONLINE === */
+        .audit-dot-online { box-shadow: 0 0 0 5px rgba(16,185,129,.10); }
+        .audit-activity-row:last-child { border-bottom: 0; }
+        .audit-history-scroll { max-height: 58vh; overflow-y: auto; }
+
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-24">
 
+    <!-- MODAL RIWAYAT AUDIT AKTIVITAS -->
+    <div id="modal-audit-history" class="hidden fixed inset-0 z-[230] flex items-center justify-center bg-blue-950/60 backdrop-blur-sm animate-fade-in px-4">
+        <div class="glass-card w-full max-w-4xl rounded-[2rem] p-5 md:p-6 shadow-2xl bg-white max-h-[92vh] overflow-hidden flex flex-col">
+            <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="text-lg font-black text-blue-950 flex items-center"><i class="fas fa-clock-rotate-left mr-2 text-blue-600"></i> Riwayat Aktivitas</h3>
+                    <p class="text-[10px] md:text-xs font-bold text-slate-500 mt-1">Log tersimpan tanpa penghapusan otomatis. Muat data lama secara bertahap agar aplikasi tetap ringan.</p>
+                </div>
+                <button onclick="closeAuditHistory()" class="w-9 h-9 shrink-0 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+                <input type="date" id="auditFilterDate" oninput="renderAuditHistoryList()" class="text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-300">
+                <select id="auditFilterActor" onchange="renderAuditHistoryList()" class="text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-300"><option value="">Semua Pengguna</option></select>
+                <select id="auditFilterType" onchange="renderAuditHistoryList()" class="text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-300">
+                    <option value="">Semua Aktivitas</option>
+                    <option value="login">Login</option><option value="logout">Logout</option><option value="checklist">Ceklis</option>
+                    <option value="attendance">Absensi</option><option value="incident">Catatan Kejadian</option><option value="handover">Serah Terima</option>
+                    <option value="missed_reason">Alasan Terlewat</option><option value="note">Catatan Tugas</option><option value="student">Data Santri</option>
+                    <option value="room">Kamar</option><option value="sop">SOP</option><option value="account">Akun</option>
+                </select>
+                <input type="search" id="auditFilterSearch" oninput="renderAuditHistoryList()" placeholder="Cari aktivitas..." class="text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-300">
+            </div>
+            <div id="auditHistoryList" class="audit-history-scroll space-y-2 pr-1 flex-1"><div class="text-center text-[11px] text-slate-400 font-bold py-8">Memuat riwayat...</div></div>
+            <div class="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <span id="auditHistoryCount" class="text-[9px] font-bold text-slate-400">0 aktivitas dimuat</span>
+                <button id="btnAuditLoadMore" onclick="loadMoreAuditHistory()" class="text-[10px] font-extrabold text-blue-700 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl hover:bg-blue-100 transition"><i class="fas fa-plus mr-1.5"></i> Muat Lebih Banyak</button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL CATATAN KEJADIAN SANTRI -->
     <div id="modal-incident" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-blue-950/60 backdrop-blur-sm animate-fade-in px-4">
@@ -643,6 +677,28 @@
                 <div class="text-[11px] font-bold text-slate-500">Menyiapkan ringkasan data hari ini...</div>
             </div>
 
+            <!-- LOG AKTIVITAS & STATUS ONLINE -->
+            <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-indigo-100">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-user-shield mr-2 text-indigo-500"></i> Log Aktivitas & Status Online</h3>
+                        <p class="text-[10px] font-bold text-slate-400 mt-1">Mengetahui siapa yang aktif, login, dan menginput atau mengubah data.</p>
+                    </div>
+                    <button onclick="openAuditHistory()" class="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl hover:bg-indigo-100 transition shrink-0"><i class="fas fa-clock-rotate-left mr-1"></i> Riwayat</button>
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    <div class="xl:col-span-1 bg-slate-50/80 border border-slate-100 rounded-2xl p-4">
+                        <div class="text-[10px] font-black text-blue-950 uppercase tracking-wider mb-3"><i class="fas fa-signal mr-1.5 text-emerald-500"></i> Status Pengguna</div>
+                        <div id="adminOnlineUsers" class="space-y-2"><div class="text-[10px] font-bold text-slate-400">Memuat status...</div></div>
+                    </div>
+                    <div class="xl:col-span-2 bg-white/70 border border-slate-100 rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-2"><div class="text-[10px] font-black text-blue-950 uppercase tracking-wider"><i class="fas fa-list-ul mr-1.5 text-blue-500"></i> Aktivitas Terbaru</div><span class="text-[9px] font-bold text-slate-400">50 terbaru</span></div>
+                        <div id="adminRecentActivity" class="max-h-72 overflow-y-auto no-scrollbar"><div class="text-[10px] font-bold text-slate-400 py-3">Memuat aktivitas...</div></div>
+                    </div>
+                </div>
+                <div class="mt-3 text-[9px] font-bold text-slate-400"><i class="fas fa-database mr-1"></i> Riwayat lama tidak ditimpa. Dashboard hanya memuat 50 aktivitas terbaru agar tetap ringan.</div>
+            </div>
+
             <!-- MANAJEMEN KAMAR (DISTRIBUSI SANTRI) -->
             <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
                 <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Manajemen Kamar & Distribusi Santri</h3>
@@ -754,7 +810,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, where, serverTimestamp, getDocs, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, where, orderBy, limit, startAfter, serverTimestamp, getDocs, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -898,6 +954,14 @@
         let musyrifProfileUnsubscribe = null;
         let roomPresenceUnsubscribe = null;
         let customChecklistUnsubscribe = null;
+        let auditRecentUnsubscribe = null;
+        let presenceAdminUnsubscribe = null;
+        let presenceHeartbeatInterval = null;
+        window.auditRecentLogs = [];
+        window.auditPresence = {};
+        window.auditHistoryLogs = [];
+        window.auditHistoryLastDoc = null;
+        window.auditHistoryHasMore = true;
 
         window.customChecklistConfig = {};
         window.daftarSantri = JSON.parse(localStorage.getItem('isyrafSantri')) || [];
@@ -953,6 +1017,224 @@
                 .replace(/'/g, '&#039;');
         };
 
+
+        window.formatAuditTimestamp = function(log) {
+            try {
+                if (log?.loggedAt?.toDate) {
+                    return log.loggedAt.toDate().toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                }
+                if (log?.clientTime) {
+                    return new Date(log.clientTime).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+                }
+            } catch (_) {}
+            return log?.timeLabel || '--';
+        };
+
+        window.getAuditIcon = function(type) {
+            const map = {
+                login:'fa-right-to-bracket text-emerald-600', logout:'fa-right-from-bracket text-slate-500',
+                checklist:'fa-square-check text-blue-600', attendance:'fa-users text-violet-600', incident:'fa-clipboard-list text-amber-600',
+                handover:'fa-right-left text-indigo-600', missed_reason:'fa-circle-exclamation text-rose-600', note:'fa-note-sticky text-amber-600',
+                student:'fa-user-graduate text-cyan-600', room:'fa-door-open text-blue-700', sop:'fa-pen-to-square text-fuchsia-600', account:'fa-user-gear text-slate-700'
+            };
+            return map[type] || 'fa-circle-info text-slate-500';
+        };
+
+        window.logActivity = async function(type, summary, details = {}) {
+            if (!localDevUid) return;
+            try {
+                const now = new Date();
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'audit_logs'), {
+                    actorUid: localDevUid,
+                    actorName: localStorage.getItem('isyrafUserName') || (currentRole === 'admin' ? 'Pimpinan' : 'Musyrif'),
+                    actorRole: currentRole || 'unknown',
+                    roomId: currentRoomId || null,
+                    type,
+                    summary,
+                    details: details && typeof details === 'object' ? details : {},
+                    dateKey: window.getYYYYMMDD(now),
+                    timeLabel: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0'),
+                    clientTime: Date.now(),
+                    loggedAt: serverTimestamp()
+                });
+            } catch (e) {
+                // Audit tidak boleh mengganggu fungsi utama bila rules/koneksi belum mendukung koleksi ini.
+                console.warn('Audit log gagal disimpan:', e);
+            }
+        };
+
+        window.updatePresence = async function(forceOffline = false) {
+            if (!localDevUid) return;
+            try {
+                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'presence', localDevUid);
+                await setDoc(ref, {
+                    uid: localDevUid,
+                    name: localStorage.getItem('isyrafUserName') || (currentRole === 'admin' ? 'Pimpinan' : 'Musyrif'),
+                    role: currentRole || 'unknown',
+                    roomId: currentRoomId || null,
+                    online: !forceOffline,
+                    lastSeen: serverTimestamp(),
+                    clientLastSeen: Date.now()
+                }, { merge: true });
+            } catch (e) {
+                console.warn('Presence gagal diperbarui:', e);
+            }
+        };
+
+        window.startPresenceHeartbeat = function() {
+            if (presenceHeartbeatInterval) clearInterval(presenceHeartbeatInterval);
+            window.updatePresence(false);
+            presenceHeartbeatInterval = setInterval(() => window.updatePresence(false), 60000);
+        };
+
+        window.stopPresenceHeartbeat = async function(markOffline = true) {
+            if (presenceHeartbeatInterval) {
+                clearInterval(presenceHeartbeatInterval);
+                presenceHeartbeatInterval = null;
+            }
+            if (markOffline) await window.updatePresence(true);
+        };
+
+        window.renderAdminPresence = function() {
+            const box = document.getElementById('adminOnlineUsers');
+            if (!box) return;
+            const now = Date.now();
+            const rows = Object.values(window.auditPresence || {}).sort((a,b) => {
+                const ao = a.online !== false && (now - (a.clientLastSeen || 0)) <= 150000;
+                const bo = b.online !== false && (now - (b.clientLastSeen || 0)) <= 150000;
+                if (ao !== bo) return bo - ao;
+                return String(a.name || '').localeCompare(String(b.name || ''), 'id');
+            });
+            if (!rows.length) {
+                box.innerHTML = '<div class="text-[10px] font-bold text-slate-400">Belum ada status pengguna.</div>';
+                return;
+            }
+            box.innerHTML = rows.map(p => {
+                let seenMs = p.clientLastSeen || 0;
+                if (p.lastSeen?.toDate) seenMs = p.lastSeen.toDate().getTime();
+                const isOnline = p.online !== false && seenMs && (now - seenMs) <= 150000;
+                let lastText = 'Belum tercatat';
+                if (seenMs) {
+                    const diffMin = Math.max(0, Math.floor((now - seenMs)/60000));
+                    lastText = isOnline ? 'Aktif sekarang' : (diffMin < 60 ? `Terakhir aktif ${diffMin} menit lalu` : new Date(seenMs).toLocaleString('id-ID', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}));
+                }
+                return `<div class="flex items-start gap-2.5 py-1.5">
+                    <span class="mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500 audit-dot-online' : 'bg-slate-300'}"></span>
+                    <div class="min-w-0"><div class="text-[10px] font-black text-slate-700 break-words">${window.escapeHtml(p.name || 'Pengguna')}</div>
+                    <div class="text-[9px] font-bold ${isOnline ? 'text-emerald-600' : 'text-slate-400'}">${window.escapeHtml(lastText)} • ${p.role === 'admin' ? 'Pimpinan' : 'Musyrif'}</div></div>
+                </div>`;
+            }).join('');
+        };
+
+        window.renderAuditRows = function(logs, compact = false) {
+            if (!logs.length) return '<div class="text-[10px] font-bold text-slate-400 py-4 text-center">Belum ada aktivitas.</div>';
+            return logs.map(log => `<div class="audit-activity-row flex items-start gap-3 py-2.5 border-b border-slate-100">
+                <div class="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0"><i class="fas ${window.getAuditIcon(log.type)} text-xs"></i></div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span class="text-[10px] font-black text-blue-950">${window.escapeHtml(log.actorName || 'Pengguna')}</span><span class="text-[8px] font-black uppercase text-slate-400">${log.actorRole === 'admin' ? 'Pimpinan' : 'Musyrif'}</span></div>
+                    <div class="text-[10px] font-semibold text-slate-600 mt-0.5 break-words">${window.escapeHtml(log.summary || log.type || 'Aktivitas')}</div>
+                    <div class="text-[8.5px] font-bold text-slate-400 mt-1"><i class="far fa-clock mr-1"></i>${window.escapeHtml(window.formatAuditTimestamp(log))}</div>
+                </div>
+            </div>`).join('');
+        };
+
+        window.renderAdminRecentActivity = function() {
+            const box = document.getElementById('adminRecentActivity');
+            if (box) box.innerHTML = window.renderAuditRows(window.auditRecentLogs || [], true);
+        };
+
+        window.setupAuditDashboard = function() {
+            if (currentRole !== 'admin') return;
+            if (auditRecentUnsubscribe) auditRecentUnsubscribe();
+            if (presenceAdminUnsubscribe) presenceAdminUnsubscribe();
+            try {
+                const qAudit = query(collection(db, 'artifacts', appId, 'public', 'data', 'audit_logs'), orderBy('loggedAt', 'desc'), limit(50));
+                auditRecentUnsubscribe = onSnapshot(qAudit, snap => {
+                    window.auditRecentLogs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+                    window.renderAdminRecentActivity();
+                }, err => {
+                    console.warn('Audit listener:', err);
+                    const box = document.getElementById('adminRecentActivity');
+                    if (box) box.innerHTML = '<div class="text-[10px] font-bold text-rose-500 py-3">Log belum dapat dibaca. Periksa Firestore Rules.</div>';
+                });
+
+                const qPresence = query(collection(db, 'artifacts', appId, 'public', 'data', 'presence'));
+                presenceAdminUnsubscribe = onSnapshot(qPresence, snap => {
+                    window.auditPresence = {};
+                    snap.forEach(d => window.auditPresence[d.id] = d.data());
+                    window.renderAdminPresence();
+                }, err => console.warn('Presence listener:', err));
+            } catch(e) { console.warn('Setup audit dashboard gagal:', e); }
+        };
+
+        window.openAuditHistory = async function() {
+            if (currentRole !== 'admin') return;
+            document.getElementById('modal-audit-history')?.classList.remove('hidden');
+            window.auditHistoryLogs = [];
+            window.auditHistoryLastDoc = null;
+            window.auditHistoryHasMore = true;
+            ['auditFilterDate','auditFilterSearch'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+            const typeEl=document.getElementById('auditFilterType'); if(typeEl) typeEl.value='';
+            const actor=document.getElementById('auditFilterActor');
+            if (actor) {
+                const names = new Map();
+                Object.values(window.auditPresence || {}).forEach(p => { if(p.uid) names.set(p.uid, p.name || 'Pengguna'); });
+                (window.auditRecentLogs || []).forEach(l => { if(l.actorUid) names.set(l.actorUid, l.actorName || 'Pengguna'); });
+                actor.innerHTML = '<option value="">Semua Pengguna</option>' + [...names.entries()].sort((a,b)=>a[1].localeCompare(b[1],'id')).map(([uid,name])=>`<option value="${window.escapeHtml(uid)}">${window.escapeHtml(name)}</option>`).join('');
+            }
+            await window.loadMoreAuditHistory(true);
+        };
+
+        window.closeAuditHistory = function() {
+            document.getElementById('modal-audit-history')?.classList.add('hidden');
+        };
+
+        window.loadMoreAuditHistory = async function(reset = false) {
+            if (currentRole !== 'admin' || (!window.auditHistoryHasMore && !reset)) return;
+            const btn = document.getElementById('btnAuditLoadMore');
+            const original = btn?.innerHTML;
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i> Memuat...'; }
+            try {
+                let qAudit;
+                const base = collection(db, 'artifacts', appId, 'public', 'data', 'audit_logs');
+                if (!reset && window.auditHistoryLastDoc) qAudit = query(base, orderBy('loggedAt','desc'), startAfter(window.auditHistoryLastDoc), limit(50));
+                else qAudit = query(base, orderBy('loggedAt','desc'), limit(50));
+                const snap = await getDocs(qAudit);
+                if (reset) window.auditHistoryLogs = [];
+                const page = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+                window.auditHistoryLogs.push(...page);
+                window.auditHistoryLastDoc = snap.docs.length ? snap.docs[snap.docs.length-1] : window.auditHistoryLastDoc;
+                window.auditHistoryHasMore = snap.docs.length === 50;
+                window.renderAuditHistoryList();
+            } catch(e) {
+                console.warn('Load audit history:', e);
+                const list=document.getElementById('auditHistoryList');
+                if(list) list.innerHTML='<div class="text-center text-[11px] text-rose-500 font-bold py-8">Riwayat belum dapat dibaca. Periksa koneksi atau Firestore Rules.</div>';
+            } finally {
+                if(btn) { btn.disabled = !window.auditHistoryHasMore; btn.innerHTML = window.auditHistoryHasMore ? original : '<i class="fas fa-check mr-1.5"></i> Semua yang tersedia telah dimuat'; }
+            }
+        };
+
+        window.renderAuditHistoryList = function() {
+            const date = document.getElementById('auditFilterDate')?.value || '';
+            const actor = document.getElementById('auditFilterActor')?.value || '';
+            const type = document.getElementById('auditFilterType')?.value || '';
+            const search = (document.getElementById('auditFilterSearch')?.value || '').trim().toLowerCase();
+            let logs = [...(window.auditHistoryLogs || [])];
+            if (date) logs = logs.filter(l => l.dateKey === date);
+            if (actor) logs = logs.filter(l => l.actorUid === actor);
+            if (type) logs = logs.filter(l => l.type === type);
+            if (search) logs = logs.filter(l => `${l.actorName||''} ${l.summary||''} ${l.type||''}`.toLowerCase().includes(search));
+            const list = document.getElementById('auditHistoryList');
+            if (list) list.innerHTML = window.renderAuditRows(logs);
+            const count = document.getElementById('auditHistoryCount');
+            if (count) count.textContent = `${window.auditHistoryLogs.length} aktivitas dimuat • ${logs.length} cocok filter`;
+        };
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && localDevUid) window.updatePresence(false);
+        });
+
         window.openIncidentModal = function() {
             const select = document.getElementById('incidentStudent');
             if (select) {
@@ -991,6 +1273,7 @@
             });
             localStorage.setItem('isyrafIncidentNotes', JSON.stringify(window.incidentNotes));
             await saveDataToFirebase();
+            await window.logActivity('incident', `Menambahkan catatan kejadian: ${student} — ${category}.`, { student, category });
             document.getElementById('incidentText').value = '';
             closeIncidentModal();
             renderMusyrifExtraCards();
@@ -1025,6 +1308,7 @@
             });
             localStorage.setItem('isyrafHandoverRecords', JSON.stringify(window.handoverRecords));
             await saveDataToFirebase();
+            await window.logActivity('handover', `Menyimpan serah terima kepada ${to}.`, { condition, sick, permit, to });
             document.getElementById('handoverNote').value = '';
             document.getElementById('handoverTo').value = '';
             closeHandoverModal();
@@ -1141,6 +1425,9 @@
                         profileRecovered = true;
                     }
 
+                    // Catat apakah sesi berasal dari tombol Login yang benar-benar ditekan pengguna.
+                    const wasExplicitLogin = !!pendingLoginRole;
+
                     // Validasi tombol yang dipilih (Musyrif/Pimpinan) dilakukan DI SINI,
                     // setelah profil tersedia. processLogin tidak boleh signOut lebih dulu.
                     if (pendingLoginRole && userData.role !== pendingLoginRole) {
@@ -1162,6 +1449,9 @@
 
                     currentRole = userData.role;
                     localDevUid = user.uid;
+
+                    window.startPresenceHeartbeat();
+                    await window.logActivity('login', wasExplicitLogin ? 'Login ke aplikasi.' : 'Sesi aplikasi aktif kembali.', { explicit: wasExplicitLogin, profileRecovered });
 
                     if (profileRecovered) {
                         showToast("Profil akun berhasil dipulihkan otomatis.", "success");
@@ -1325,6 +1615,7 @@
                         name: name, 
                         role: 'musyrif' 
                     });
+                    await window.logActivity('account', `Menambahkan whitelist akun musyrif: ${name}.`, { email, name });
                     showToast(`Email ${email} berhasil di-whitelist!`, "success");
                     closeAkunModal();
                     document.getElementById('newAccEmail').value = '';
@@ -1392,6 +1683,7 @@
                     ...whitelistDeletes,
                     deleteDoc(userRef)
                 ]);
+                await window.logActivity('account', `Mengeluarkan musyrif dari aplikasi: ${nama}.`, { targetUid: uid, targetName: nama, email });
 
                 // Pertahankan kamar yang sedang dipilih, lalu muat ulang daftar agar nama langsung hilang.
                 const selectedRoom = document.getElementById('adminRoomSelect')?.value || '';
@@ -1507,6 +1799,7 @@
                     santri: santriArr,
                     musyrifs: musyrifsArr
                 }, { merge: true });
+                await window.logActivity('room', `${roomId ? 'Memperbarui' : 'Membuat'} data kamar ${roomName}.`, { roomId: docRef.id, roomName, jumlahSantri: santriArr.length, jumlahMusyrif: musyrifsArr.length });
                 
                 showToast("Data kamar berhasil disimpan!", "success");
                 await window.loadAdminSantriManager(); 
@@ -1598,6 +1891,7 @@
                     }
                 };
                 await setDoc(docRef, updateData, { merge: true });
+                await window.logActivity('sop', `Memperbarui SOP: ${newTitle}.`, { dayType, taskId, title: newTitle });
                 
                 showToast("SOP berhasil diperbarui!", "success");
             } catch(e) {
@@ -1618,6 +1912,7 @@
                 if (!snapshot.empty) {
                     const roomDoc = snapshot.docs[0];
                     currentRoomId = roomDoc.id;
+                    window.updatePresence(false);
                     const data = roomDoc.data();
                     
                     window.daftarSantri = data.santri || [];
@@ -2011,6 +2306,7 @@
                 target = 'screen-admin';
                 document.getElementById('adminDateSelector').value = window.adminSelectedDate;
                 setupAdminListener();
+                window.setupAuditDashboard();
                 setTimeout(() => window.loadChartData(7), 800); 
                 window.loadAdminSantriManager();
             }
@@ -2027,8 +2323,12 @@
             if (musyrifProfileUnsubscribe) { musyrifProfileUnsubscribe(); musyrifProfileUnsubscribe = null; }
             if (roomPresenceUnsubscribe) { roomPresenceUnsubscribe(); roomPresenceUnsubscribe = null; }
             if (customChecklistUnsubscribe) { customChecklistUnsubscribe(); customChecklistUnsubscribe = null; }
+            if (auditRecentUnsubscribe) { auditRecentUnsubscribe(); auditRecentUnsubscribe = null; }
+            if (presenceAdminUnsubscribe) { presenceAdminUnsubscribe(); presenceAdminUnsubscribe = null; }
 
             try {
+                await window.logActivity('logout', 'Logout dari aplikasi.');
+                await window.stopPresenceHeartbeat(true);
                 const auth = getAuth(app);
                 await signOut(auth);
             } catch(e) { console.error("Logout error:", e); }
@@ -2323,7 +2623,8 @@
             if (now < s) return showToast("Waktu ceklis untuk sesi ini belum dimulai!", "error");
             if (now >= e && !window.checklistState[taskId]) return showToast("Waktu ceklis untuk sesi ini sudah ditutup!", "error");
 
-            if (window.checklistState[taskId]) {
+            const wasChecked = !!window.checklistState[taskId];
+            if (wasChecked) {
                 delete window.checklistState[taskId];
             } else {
                 const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
@@ -2332,6 +2633,7 @@
             
             localStorage.setItem('isyrafState', JSON.stringify(window.checklistState));
             await saveDataToFirebase();
+            await window.logActivity('checklist', `${wasChecked ? 'Membatalkan ceklis' : 'Menceklis'} tugas: ${task.title}.`, { taskId, taskTitle: task.title, checked: !wasChecked });
             window.forceRender = true;
             updateAppLoop();
         };
@@ -2367,6 +2669,8 @@
             };
             localStorage.setItem('isyrafMissedReasons', JSON.stringify(window.missedReasons));
             await saveDataToFirebase();
+            const missedTask = generateSchedule(globalPrayers, now.getDay()).find(t => t.id === taskId);
+            await window.logActivity('missed_reason', `Memberikan alasan tugas terlewat: ${missedTask?.title || 'Tugas'}.`, { taskId, reason, detail });
             window.activeEditors.delete(`reason-${taskId}`);
             window.forceRender = true;
             updateAppLoop();
@@ -2403,6 +2707,7 @@
 
         window.saveNote = async function(taskId) {
             const input = document.getElementById(`note-input-${taskId}`).value;
+            const hadNote = !!window.notesState[taskId];
             if (input.trim() === '') {
                 delete window.notesState[taskId];
                 showToast("Catatan dihapus.", "success");
@@ -2412,6 +2717,8 @@
             }
             localStorage.setItem('isyrafNotes', JSON.stringify(window.notesState));
             await saveDataToFirebase();
+            const noteTask = generateSchedule(globalPrayers, new Date().getDay()).find(t => t.id === taskId);
+            await window.logActivity('note', `${input.trim() === '' ? 'Menghapus' : (hadNote ? 'Memperbarui' : 'Menambahkan')} catatan tugas: ${noteTask?.title || 'Tugas'}.`, { taskId, taskTitle: noteTask?.title || '' });
             document.getElementById(`note-editor-${taskId}`).classList.add('hidden');
             window.activeEditors.delete(taskId);
             window.forceRender = true;
@@ -2431,6 +2738,7 @@
                 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                 await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
+                await window.logActivity('student', `Menambahkan santri: ${name}.`, { student: name, roomId: currentRoomId });
                 
                 window.forceRender = true;
                 updateAppLoop();
@@ -2450,6 +2758,7 @@
                 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                 await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
+                await window.logActivity('student', `Menghapus santri dari kamar: ${name}.`, { student: name, roomId: currentRoomId });
                 
                 window.forceRender = true;
                 updateAppLoop();
@@ -2477,6 +2786,7 @@
                     
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                     await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
+                    await window.logActivity('student', `Mengubah nama santri: ${oldName} → ${cleanName}.`, { oldName, newName: cleanName, roomId: currentRoomId });
                     
                     window.forceRender = true;
                     updateAppLoop();
@@ -2488,8 +2798,10 @@
             const session = window.getAbsensiSession(new Date(), false);
             if (!session) return showToast("Perubahan absensi hanya dapat dilakukan pada jadwal absensi.", "error");
             const state = window.getAttendanceStateForSession(session);
+            const previous = state[name] || 'H';
             state[name] = status;
             window.persistAttendanceStates();
+            if (previous !== status) await window.logActivity('attendance', `Mengubah absensi ${session === 'morning' ? 'pagi' : 'malam'} ${name}: ${previous} → ${status}.`, { session, student: name, previous, status });
             renderAbsensiUI();
         };
 
@@ -2539,6 +2851,8 @@
                 payload.attendance = { ...activeState };
 
                 await setDoc(roomRef, payload, { merge: true });
+                const attendanceCounts = window.getAttendanceCounts(activeState);
+                await window.logActivity('attendance', `Menyimpan Absensi ${session === 'morning' ? 'Pagi' : 'Malam'} (${window.daftarSantri.length} santri).`, { session, roomId: currentRoomId, counts: attendanceCounts });
 
                 showToast(`Data absensi ${session === 'morning' ? 'pagi' : 'malam'} berhasil dikunci dan disinkronkan ke Pimpinan!`, "success");
                 renderAbsensiUI();
