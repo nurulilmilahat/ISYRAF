@@ -44,9 +44,104 @@
             visibility: hidden;
             transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
         }
+
+
+        /* === PEDOMAN TUGAS MUSYRIF (integrasi dari dokumen rincian tugas) === */
+        .ped-toolbar { position: sticky; top: 175px; z-index: 35; }
+        .ped-day-btn { transition: all .25s ease; }
+        .ped-day-btn.active { background: linear-gradient(135deg,#1e40af,#3b82f6); color:#fff; border-color:transparent; box-shadow:0 8px 22px -10px rgba(37,99,235,.65); }
+        .ped-card { background:rgba(255,255,255,.9); border:1px solid rgba(226,232,240,.95); box-shadow:0 8px 28px -18px rgba(15,23,42,.25); }
+        .ped-card:hover { transform:translateY(-1px); box-shadow:0 14px 32px -18px rgba(15,23,42,.32); }
+        .ped-time { background:linear-gradient(135deg,#eff6ff,#ecfeff); border:1px solid #dbeafe; }
+        .ped-detail-list, .ped-card ul { margin:0; padding:0; list-style:none; display:grid; gap:.45rem; }
+        .ped-card li { position:relative; padding-left:1rem; }
+        .ped-card li::before { content:""; position:absolute; left:0; top:.62em; width:6px; height:6px; border-radius:999px; background:linear-gradient(135deg,#60a5fa,#10b981); }
+        .ped-card p { margin:0; }
+        .ped-card p + p { margin-top:.45rem; }
+        .ped-empty { border:1px dashed #cbd5e1; background:rgba(255,255,255,.65); }
+        @media (max-width: 480px) {
+            .ped-toolbar { top: 168px; }
+        }
+
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-24">
+
+
+    <!-- MODAL CATATAN KEJADIAN SANTRI -->
+    <div id="modal-incident" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-blue-950/60 backdrop-blur-sm animate-fade-in px-4">
+        <div class="glass-card w-full max-w-sm rounded-[2rem] p-6 shadow-2xl bg-white max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-black text-blue-950 mb-2 flex items-center"><i class="fas fa-clipboard-list mr-2 text-amber-500"></i> Catatan Kejadian Santri</h3>
+            <p class="text-xs font-bold text-slate-500 mb-5 leading-relaxed">Catat kejadian penting santri hari ini agar dapat langsung dipantau oleh Pimpinan.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Santri</label>
+                    <select id="incidentStudent" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="Umum / Kamar">Umum / Kamar</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Jenis Kejadian</label>
+                    <select id="incidentCategory" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="Sakit">Sakit</option>
+                        <option value="Terlambat Kegiatan">Terlambat Kegiatan</option>
+                        <option value="Pelanggaran">Pelanggaran</option>
+                        <option value="Bertengkar">Bertengkar</option>
+                        <option value="Tidak Mengikuti Halakah">Tidak Mengikuti Halakah</option>
+                        <option value="Prestasi / Perilaku Baik">Prestasi / Perilaku Baik</option>
+                        <option value="Lainnya">Lainnya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Catatan</label>
+                    <textarea id="incidentText" rows="4" placeholder="Tuliskan kejadian secara singkat dan jelas..." class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+                </div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+                <button onclick="closeIncidentModal()" class="flex-1 py-3 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">Batal</button>
+                <button onclick="saveIncidentNote()" class="flex-1 py-3 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-md transition"><i class="fas fa-save mr-1.5"></i> Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SERAH TERIMA MUSYRIF -->
+    <div id="modal-handover" class="hidden fixed inset-0 z-[210] flex items-center justify-center bg-blue-950/60 backdrop-blur-sm animate-fade-in px-4">
+        <div class="glass-card w-full max-w-sm rounded-[2rem] p-6 shadow-2xl bg-white max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-black text-blue-950 mb-2 flex items-center"><i class="fas fa-right-left mr-2 text-indigo-500"></i> Serah Terima Musyrif</h3>
+            <p class="text-xs font-bold text-slate-500 mb-5 leading-relaxed">Simpan kondisi terakhir kamar agar informasi tidak terputus saat pergantian musyrif.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Kondisi Kamar</label>
+                    <select id="handoverCondition" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="Aman">Aman</option>
+                        <option value="Perlu Perhatian">Perlu Perhatian</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-extrabold text-blue-900 uppercase mb-1">Santri Sakit</label>
+                        <input type="number" min="0" id="handoverSick" value="0" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-extrabold text-blue-900 uppercase mb-1">Santri Izin</label>
+                        <input type="number" min="0" id="handoverPermit" value="0" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Diteruskan Kepada</label>
+                    <input type="text" id="handoverTo" placeholder="Contoh: Ust. Ahmad" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Catatan</label>
+                    <textarea id="handoverNote" rows="4" placeholder="Contoh: Ahmad demam sejak sore..." class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+                </div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+                <button onclick="closeHandoverModal()" class="flex-1 py-3 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">Batal</button>
+                <button onclick="saveHandover()" class="flex-1 py-3 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md transition"><i class="fas fa-save mr-1.5"></i> Simpan</button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL REKAP RENTANG WAKTU -->
     <div id="modal-rekap" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-blue-950/60 backdrop-blur-sm animate-fade-in px-4">
@@ -130,7 +225,7 @@
         <div class="text-center mb-8 relative z-10">
             <span class="inline-block bg-indigo-100 text-indigo-800 text-[10px] font-black px-3 py-1 rounded-full border border-indigo-200 uppercase tracking-widest mb-4">PONPES NURUL ILMI LAHAT</span>
             <h1 class="text-[2.5rem] font-black text-blue-950 tracking-tighter leading-none mb-3 uppercase drop-shadow-sm">ISYRAF</h1>
-            <p class="text-slate-600 text-[14px] font-bold tracking-wide leading-relaxed uppercase mb-1">SISTEM MONITORING KEGIATAN MUSYRIF</p>
+            <p class="text-slate-600 text-[14px] font-bold tracking-wide leading-relaxed uppercase mb-1">SISTEM MONITORING SANTRI & KEGIATAN MUSYRIF</p>
         </div>
 
         <div class="w-full relative z-10 bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white shadow-2xl">
@@ -273,9 +368,10 @@
 
         <main class="max-w-md mx-auto p-5">
             <div class="glass-card rounded-[2rem] p-1.5 mb-8 flex shadow-sm border border-slate-100">
-                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 py-3.5 text-center text-[13px] font-extrabold bg-white text-blue-800 rounded-[1.8rem] shadow-sm transition-all duration-300">Ringkasan</button>
-                <button onclick="switchTab('ceklis')" id="tab-ceklis" class="flex-1 py-3.5 text-center text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]">Ceklis</button>
-                <button onclick="switchTab('absensi')" id="tab-absensi" class="flex-1 py-3.5 text-center text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]">Absensi</button>
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 py-3.5 text-center text-[12px] font-extrabold bg-white text-blue-800 rounded-[1.8rem] shadow-sm transition-all duration-300">Ringkasan</button>
+                <button onclick="switchTab('ceklis')" id="tab-ceklis" class="flex-1 py-3.5 text-center text-[12px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]">Ceklis</button>
+                <button onclick="switchTab('absensi')" id="tab-absensi" class="flex-1 py-3.5 text-center text-[12px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]">Absensi</button>
+                <button onclick="switchTab('pedoman')" id="tab-pedoman" class="flex-1 py-3.5 text-center text-[12px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]">Pedoman</button>
             </div>
 
             <div id="view-dashboard" class="block animate-fade-in">
@@ -289,6 +385,69 @@
                     <div class="flex items-center text-[15px] text-slate-700 font-bold relative z-10 bg-amber-50 w-max px-4 py-1.5 rounded-xl border border-amber-100 shadow-sm">
                         <i class="far fa-clock mr-2.5 text-amber-500"></i>
                         <span id="currentActivityTime">--:-- s/d --:--</span>
+                    </div>
+                </div>
+
+                <!-- PENGINGAT JADWAL ABSENSI -->
+                <div id="absensiReminderCard" class="glass-card rounded-[2rem] p-5 mb-6 border border-blue-100 shadow-sm transition-all duration-300">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center">
+                                <i class="fas fa-clipboard-user mr-2 text-blue-500"></i> Pengingat Absensi Santri
+                            </h3>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Dilakukan 2 kali setiap hari</p>
+                        </div>
+                        <button onclick="switchTab('absensi')" class="text-[10px] font-extrabold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-2 rounded-xl hover:bg-blue-100 transition">
+                            Buka Absensi
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="switchTab('absensi')" class="text-left bg-white/80 border border-slate-200 rounded-2xl p-4 hover:border-blue-200 transition">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Pagi</span>
+                                <span id="absensiMorningStatus" class="text-[9px] font-black px-2 py-1 rounded-lg bg-slate-100 text-slate-500">BELUM</span>
+                            </div>
+                            <div class="text-[15px] font-black text-blue-950">07.10–07.20</div>
+                        </button>
+
+                        <button onclick="switchTab('absensi')" class="text-left bg-white/80 border border-slate-200 rounded-2xl p-4 hover:border-blue-200 transition">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Malam</span>
+                                <span id="absensiNightStatus" class="text-[9px] font-black px-2 py-1 rounded-lg bg-slate-100 text-slate-500">BELUM</span>
+                            </div>
+                            <div class="text-[15px] font-black text-blue-950">21.30–22.00</div>
+                        </button>
+                    </div>
+
+                    <div id="absensiReminderMessage" class="mt-3 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 leading-relaxed">
+                        Absensi dilakukan pagi pukul 07.10–07.20 dan malam pukul 21.30–22.00.
+                    </div>
+                </div>
+
+
+                <!-- CATATAN KEJADIAN & SERAH TERIMA -->
+                <div class="grid grid-cols-1 gap-4 mb-6">
+                    <div class="glass-card rounded-[2rem] p-5 border border-amber-100 shadow-sm">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-clipboard-list mr-2 text-amber-500"></i> Catatan Kejadian Santri</h3>
+                                <p class="text-[10px] font-bold text-slate-400 mt-1">Kejadian penting hari ini</p>
+                            </div>
+                            <button onclick="openIncidentModal()" class="text-[10px] font-extrabold text-amber-700 bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl hover:bg-amber-100 transition"><i class="fas fa-plus mr-1"></i> Catat</button>
+                        </div>
+                        <div id="incidentQuickSummary" class="mt-4 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3">Belum ada catatan kejadian hari ini.</div>
+                    </div>
+
+                    <div class="glass-card rounded-[2rem] p-5 border border-indigo-100 shadow-sm">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-right-left mr-2 text-indigo-500"></i> Serah Terima Musyrif</h3>
+                                <p class="text-[10px] font-bold text-slate-400 mt-1">Catat kondisi terakhir sebelum pergantian tugas</p>
+                            </div>
+                            <button onclick="openHandoverModal()" class="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl hover:bg-indigo-100 transition"><i class="fas fa-pen mr-1"></i> Isi</button>
+                        </div>
+                        <div id="handoverQuickSummary" class="mt-4 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3">Belum ada serah terima hari ini.</div>
                     </div>
                 </div>
 
@@ -333,6 +492,19 @@
                 <!-- KELOLA ABSENSI -->
                 <div class="glass-card p-5 rounded-[2rem] shadow-sm">
                     <h3 class="text-[14px] font-extrabold text-blue-950 mb-4 flex items-center"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Kelola Absensi Kamar</h3>
+                    <div id="absensiSessionBanner" class="mb-4 rounded-2xl border p-4 transition-all duration-300">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center min-w-0">
+                                <div id="absensiSessionIcon" class="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shrink-0"><i class="fas fa-sun"></i></div>
+                                <div class="min-w-0">
+                                    <div id="absensiSessionTitle" class="text-[13px] font-black uppercase tracking-wide">Absensi Pagi</div>
+                                    <div id="absensiSessionTime" class="text-[11px] font-bold opacity-75 mt-0.5">07.10–07.20</div>
+                                </div>
+                            </div>
+                            <span id="absensiSessionBadge" class="text-[9px] font-black px-2.5 py-1.5 rounded-lg whitespace-nowrap">BELUM DIMULAI</span>
+                        </div>
+                        <p id="absensiSessionHelp" class="text-[10px] font-semibold mt-3 leading-relaxed opacity-80">Absensi pagi dan malam disimpan sebagai dua data yang terpisah.</p>
+                    </div>
                     <div id="absensiInputContainer" class="flex space-x-2 mb-4 transition-all">
                         <input type="text" id="newSantriName" placeholder="Nama santri baru..." class="flex-1 text-[13px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
                         <button onclick="addSantri()" class="bg-blue-600 text-white font-bold px-4 rounded-xl hover:bg-blue-700 transition"><i class="fas fa-plus"></i></button>
@@ -352,6 +524,46 @@
                     </div>
                 </div>
             </div>
+
+
+            <!-- PEDOMAN RINCI TUGAS MUSYRIF -->
+            <div id="view-pedoman" class="hidden animate-fade-in pb-10">
+                <div class="glass-card rounded-[2.3rem] p-6 mb-5 border border-blue-100 shadow-sm overflow-hidden relative">
+                    <div class="absolute -right-8 -top-8 text-blue-500/10"><i class="fas fa-book-open text-8xl"></i></div>
+                    <div class="relative z-10">
+                        <span class="inline-flex items-center text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full mb-3"><i class="fas fa-shield-alt mr-1.5"></i> Pedoman Kegiatan Harian</span>
+                        <h2 class="text-[20px] font-black text-blue-950 leading-tight mb-2">Rincian Tugas Musyrif</h2>
+                        <p class="text-[12px] font-semibold text-slate-600 leading-relaxed">Gunakan bagian ini untuk membaca rincian tugas dan keterangan lengkap. Untuk kegiatan yang mengikuti waktu salat, jam aktual tetap mengikuti jadwal salat pada sistem ISYRAF.</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-5 relative z-10">
+                        <div class="bg-blue-50 border border-blue-100 rounded-2xl p-3 text-center"><div class="text-xl font-black text-blue-700">23</div><div class="text-[9px] font-black uppercase text-slate-500">Umum</div></div>
+                        <div class="bg-cyan-50 border border-cyan-100 rounded-2xl p-3 text-center"><div class="text-xl font-black text-cyan-700">20</div><div class="text-[9px] font-black uppercase text-slate-500">Sabtu</div></div>
+                        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-3 text-center"><div class="text-xl font-black text-emerald-700">19</div><div class="text-[9px] font-black uppercase text-slate-500">Ahad</div></div>
+                    </div>
+                </div>
+
+                <div class="ped-toolbar glass-card rounded-[1.8rem] p-3 mb-5 border border-slate-100 shadow-md backdrop-blur-xl">
+                    <div class="grid grid-cols-3 gap-2 mb-3" id="pedomanDayButtons">
+                        <button onclick="setPedomanDay('umum')" id="ped-day-umum" class="ped-day-btn active text-[11px] font-black py-2.5 px-2 rounded-xl border border-slate-200 bg-white text-slate-600">Umum</button>
+                        <button onclick="setPedomanDay('sabtu')" id="ped-day-sabtu" class="ped-day-btn text-[11px] font-black py-2.5 px-2 rounded-xl border border-slate-200 bg-white text-slate-600">Sabtu</button>
+                        <button onclick="setPedomanDay('ahad')" id="ped-day-ahad" class="ped-day-btn text-[11px] font-black py-2.5 px-2 rounded-xl border border-slate-200 bg-white text-slate-600">Ahad</button>
+                    </div>
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input id="pedomanSearch" oninput="filterPedoman(this.value)" type="search" placeholder="Cari tugas atau keterangan..." class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-[12px] font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between px-2 mb-3">
+                    <div>
+                        <div class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.16em]">Jadwal Terpilih</div>
+                        <h3 id="pedomanSectionTitle" class="text-[15px] font-black text-blue-950">Jadwal Umum</h3>
+                    </div>
+                    <span id="pedomanCount" class="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl">23 kegiatan</span>
+                </div>
+                <div id="pedomanContainer" class="space-y-3"></div>
+            </div>
+
         </main>
     </div>
 
@@ -381,6 +593,15 @@
         </header>
 
         <main class="max-w-md mx-auto p-5 animate-fade-in pb-10">
+            <!-- RINGKASAN HARIAN PIMPINAN -->
+            <div id="adminDailySummary" class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-blue-100">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-gauge-high mr-2 text-blue-500"></i> Ringkasan Harian</h3>
+                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Memuat...</span>
+                </div>
+                <div class="text-[11px] font-bold text-slate-500">Menyiapkan ringkasan data hari ini...</div>
+            </div>
+
             <!-- MANAJEMEN KAMAR (DISTRIBUSI SANTRI) -->
             <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
                 <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Manajemen Kamar & Distribusi Santri</h3>
@@ -555,6 +776,67 @@
             return (mins >= 430 && mins <= 440) || (mins >= 1290 && mins <= 1320); 
         };
 
+        window.getAbsensiSession = function(now = new Date(), forDisplay = false) {
+            const mins = now.getHours() * 60 + now.getMinutes();
+            if (mins >= 430 && mins <= 440) return 'morning';
+            if (mins >= 1290 && mins <= 1320) return 'night';
+            if (!forDisplay) return null;
+            // Di luar jam input, tampilkan sesi yang paling relevan/berikutnya.
+            if (mins < 430) return 'morning';
+            if (mins > 440 && mins < 1290) return 'night';
+            return 'night';
+        };
+
+        window.getAttendanceStateForSession = function(session) {
+            return session === 'night' ? window.attendanceNightState : window.attendanceMorningState;
+        };
+
+        window.persistAttendanceStates = function() {
+            localStorage.setItem('isyrafAttendanceMorning', JSON.stringify(window.attendanceMorningState));
+            localStorage.setItem('isyrafAttendanceNight', JSON.stringify(window.attendanceNightState));
+        };
+
+        window.ensureAttendanceRosterDefaults = function() {
+            (window.daftarSantri || []).forEach(name => {
+                if (!window.attendanceMorningState[name]) window.attendanceMorningState[name] = 'H';
+                if (!window.attendanceNightState[name]) window.attendanceNightState[name] = 'H';
+            });
+            window.persistAttendanceStates();
+        };
+
+        window.normalizeRoomAttendanceData = function(data = {}) {
+            let morning = data.attendanceMorning && typeof data.attendanceMorning === 'object' ? { ...data.attendanceMorning } : {};
+            let night = data.attendanceNight && typeof data.attendanceNight === 'object' ? { ...data.attendanceNight } : {};
+            const legacy = data.attendance && typeof data.attendance === 'object' ? data.attendance : {};
+            const hasSeparatedMorning = data.attendanceMorning && typeof data.attendanceMorning === 'object';
+            const hasSeparatedNight = data.attendanceNight && typeof data.attendanceNight === 'object';
+            let savedMorning = data.savedMorning === true || Object.keys(morning).length > 0;
+            let savedNight = data.savedNight === true || Object.keys(night).length > 0;
+
+            // Kompatibilitas konservatif untuk data lama: field attendance adalah simpan terakhir.
+            // Jika malam pernah tersimpan, anggap field lama sebagai data malam dan jangan menebak data pagi.
+            if (Object.keys(legacy).length) {
+                if (!hasSeparatedNight && data.savedNight === true && !Object.keys(night).length) {
+                    night = { ...legacy };
+                } else if (!hasSeparatedMorning && data.savedMorning === true && !Object.keys(morning).length) {
+                    morning = { ...legacy };
+                }
+            }
+            if (!hasSeparatedMorning && data.savedMorning === true && data.savedNight === true && !Object.keys(morning).length) {
+                savedMorning = false;
+            }
+
+            return { morning, night, savedMorning, savedNight };
+        };
+
+        window.getAttendanceCounts = function(attendance = {}) {
+            const counts = { H: 0, S: 0, I: 0, A: 0 };
+            Object.values(attendance || {}).forEach(status => {
+                if (counts[status] !== undefined) counts[status]++;
+            });
+            return counts;
+        };
+
         window.getCheckpointWindow = function(taskStart, taskEnd) {
             if (!taskStart) return { start: taskStart, end: taskEnd };
             const [h, m] = taskStart.split(':').map(Number);
@@ -580,9 +862,23 @@
         window.daftarSantri = JSON.parse(localStorage.getItem('isyrafSantri')) || [];
         window.checklistState = JSON.parse(localStorage.getItem('isyrafState')) || {};
         window.notesState = JSON.parse(localStorage.getItem('isyrafNotes')) || {};
-        window.attendanceState = JSON.parse(localStorage.getItem('isyrafAttendance')) || {};
-        window.attendanceSavedMorning = localStorage.getItem('isyrafAttendanceSavedMorning') === 'true'; 
-        window.attendanceSavedNight = localStorage.getItem('isyrafAttendanceSavedNight') === 'true'; 
+        window.missedReasons = JSON.parse(localStorage.getItem('isyrafMissedReasons')) || {};
+        window.incidentNotes = JSON.parse(localStorage.getItem('isyrafIncidentNotes')) || [];
+        window.handoverRecords = JSON.parse(localStorage.getItem('isyrafHandoverRecords')) || [];
+        window.attendanceSavedMorning = localStorage.getItem('isyrafAttendanceSavedMorning') === 'true';
+        window.attendanceSavedNight = localStorage.getItem('isyrafAttendanceSavedNight') === 'true';
+        const legacyAttendanceState = JSON.parse(localStorage.getItem('isyrafAttendance')) || {};
+        window.attendanceMorningState = JSON.parse(localStorage.getItem('isyrafAttendanceMorning')) || {};
+        window.attendanceNightState = JSON.parse(localStorage.getItem('isyrafAttendanceNight')) || {};
+        // Migrasi konservatif dari versi lama. Bila pagi dan malam sama-sama pernah disimpan,
+        // field lama hanya merepresentasikan simpan terakhir (umumnya malam), sehingga tidak disalin ke pagi.
+        if (Object.keys(legacyAttendanceState).length) {
+            if (!Object.keys(window.attendanceNightState).length && window.attendanceSavedNight) {
+                window.attendanceNightState = { ...legacyAttendanceState };
+            } else if (!Object.keys(window.attendanceMorningState).length && window.attendanceSavedMorning) {
+                window.attendanceMorningState = { ...legacyAttendanceState };
+            }
+        }
 
         window.activeEditors = new Set();
         window.activeKeterangan = new Set();
@@ -605,6 +901,132 @@
             toast.innerHTML = `<i class="fas ${icon} mt-0.5 mr-3 text-lg"></i> <div>${message}</div>`;
             
             setTimeout(() => { toast.classList.add('opacity-0', '-translate-y-4'); }, 6000);
+        };
+
+        window.escapeHtml = function(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        };
+
+        window.openIncidentModal = function() {
+            const select = document.getElementById('incidentStudent');
+            if (select) {
+                select.innerHTML = '';
+                const umum = document.createElement('option');
+                umum.value = 'Umum / Kamar';
+                umum.textContent = 'Umum / Kamar';
+                select.appendChild(umum);
+                [...(window.daftarSantri || [])].sort((a,b) => a.localeCompare(b, 'id')).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    select.appendChild(opt);
+                });
+            }
+            document.getElementById('modal-incident').classList.remove('hidden');
+        };
+
+        window.closeIncidentModal = function() {
+            document.getElementById('modal-incident').classList.add('hidden');
+        };
+
+        window.saveIncidentNote = async function() {
+            const student = document.getElementById('incidentStudent').value || 'Umum / Kamar';
+            const category = document.getElementById('incidentCategory').value || 'Lainnya';
+            const note = document.getElementById('incidentText').value.trim();
+            if (!note) return showToast("Catatan kejadian wajib diisi.", "error");
+
+            const now = new Date();
+            window.incidentNotes.push({
+                id: `${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+                student,
+                category,
+                note,
+                time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+            });
+            localStorage.setItem('isyrafIncidentNotes', JSON.stringify(window.incidentNotes));
+            await saveDataToFirebase();
+            document.getElementById('incidentText').value = '';
+            closeIncidentModal();
+            renderMusyrifExtraCards();
+            showToast("Catatan kejadian berhasil disimpan.", "success");
+        };
+
+        window.openHandoverModal = function() {
+            document.getElementById('modal-handover').classList.remove('hidden');
+        };
+
+        window.closeHandoverModal = function() {
+            document.getElementById('modal-handover').classList.add('hidden');
+        };
+
+        window.saveHandover = async function() {
+            const condition = document.getElementById('handoverCondition').value || 'Aman';
+            const sick = Math.max(0, parseInt(document.getElementById('handoverSick').value || '0', 10) || 0);
+            const permit = Math.max(0, parseInt(document.getElementById('handoverPermit').value || '0', 10) || 0);
+            const to = document.getElementById('handoverTo').value.trim();
+            const note = document.getElementById('handoverNote').value.trim();
+            if (!to) return showToast("Kolom 'Diteruskan Kepada' wajib diisi.", "error");
+
+            const now = new Date();
+            window.handoverRecords.push({
+                id: `${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+                condition,
+                sick,
+                permit,
+                to,
+                note,
+                time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+            });
+            localStorage.setItem('isyrafHandoverRecords', JSON.stringify(window.handoverRecords));
+            await saveDataToFirebase();
+            document.getElementById('handoverNote').value = '';
+            document.getElementById('handoverTo').value = '';
+            closeHandoverModal();
+            renderMusyrifExtraCards();
+            showToast("Serah terima berhasil disimpan.", "success");
+        };
+
+        window.renderMusyrifExtraCards = function() {
+            const incidentBox = document.getElementById('incidentQuickSummary');
+            if (incidentBox) {
+                const items = Array.isArray(window.incidentNotes) ? window.incidentNotes : [];
+                if (!items.length) {
+                    incidentBox.innerHTML = 'Belum ada catatan kejadian hari ini.';
+                } else {
+                    const latest = items.slice(-3).reverse().map(item => `
+                        <div class="py-2 ${items.length > 1 ? 'border-b border-slate-100 last:border-0' : ''}">
+                            <div class="flex justify-between gap-2"><span class="font-black text-amber-700">${window.escapeHtml(item.student)}</span><span class="text-[9px] text-slate-400">${window.escapeHtml(item.time)}</span></div>
+                            <div class="text-[10px] font-extrabold text-slate-600">${window.escapeHtml(item.category)}</div>
+                            <div class="text-[10px] font-semibold text-slate-500 mt-0.5 line-clamp-2">${window.escapeHtml(item.note)}</div>
+                        </div>`).join('');
+                    incidentBox.innerHTML = `<div class="mb-1 text-[10px] font-black text-blue-950">${items.length} catatan hari ini</div>${latest}`;
+                }
+            }
+
+            const handoverBox = document.getElementById('handoverQuickSummary');
+            if (handoverBox) {
+                const records = Array.isArray(window.handoverRecords) ? window.handoverRecords : [];
+                const latest = records[records.length - 1];
+                if (!latest) {
+                    handoverBox.innerHTML = 'Belum ada serah terima hari ini.';
+                } else {
+                    const conditionCls = latest.condition === 'Aman' ? 'text-emerald-700 bg-emerald-100' : 'text-amber-700 bg-amber-100';
+                    handoverBox.innerHTML = `
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="text-[9px] font-black px-2 py-1 rounded-lg ${conditionCls}">${window.escapeHtml(latest.condition)}</span>
+                            <span class="text-[9px] text-slate-400 font-bold">${window.escapeHtml(latest.time)}</span>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-600">Sakit: ${latest.sick || 0} • Izin: ${latest.permit || 0}</div>
+                        <div class="text-[10px] font-bold text-indigo-700 mt-1">Diteruskan kepada: ${window.escapeHtml(latest.to)}</div>
+                        ${latest.note ? `<div class="text-[10px] font-semibold text-slate-500 mt-1">${window.escapeHtml(latest.note)}</div>` : ''}
+                        <div class="text-[9px] text-slate-400 font-bold mt-2">${records.length} catatan serah terima hari ini</div>`;
+                }
+            }
         };
 
         function syncCustomChecklist() {
@@ -1162,12 +1584,7 @@
                     
                     document.getElementById('musyrifNameDisplay').innerText = (localStorage.getItem('isyrafUserName') || 'Musyrif') + ` • ${data.name.toUpperCase()}`;
 
-                    window.daftarSantri.forEach(name => {
-                        if (!window.attendanceState[name]) {
-                            window.attendanceState[name] = 'H';
-                        }
-                    });
-                    localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+                    window.ensureAttendanceRosterDefaults();
                     
                     syncRoomPresence();
                 } else {
@@ -1190,18 +1607,14 @@
             roomPresenceUnsubscribe = onSnapshot(roomRef, (snapshot) => {
                 if (snapshot.exists()) {
                     const data = snapshot.data();
-                    if (data.attendance) {
-                        window.attendanceState = data.attendance;
-                        localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
-                    }
-                    if (data.savedMorning !== undefined) {
-                        window.attendanceSavedMorning = data.savedMorning;
-                        localStorage.setItem('isyrafAttendanceSavedMorning', window.attendanceSavedMorning ? 'true' : 'false');
-                    }
-                    if (data.savedNight !== undefined) {
-                        window.attendanceSavedNight = data.savedNight;
-                        localStorage.setItem('isyrafAttendanceSavedNight', window.attendanceSavedNight ? 'true' : 'false');
-                    }
+                    const normalizedAttendance = window.normalizeRoomAttendanceData(data);
+                    window.attendanceMorningState = normalizedAttendance.morning;
+                    window.attendanceNightState = normalizedAttendance.night;
+                    window.attendanceSavedMorning = normalizedAttendance.savedMorning;
+                    window.attendanceSavedNight = normalizedAttendance.savedNight;
+                    window.ensureAttendanceRosterDefaults();
+                    localStorage.setItem('isyrafAttendanceSavedMorning', window.attendanceSavedMorning ? 'true' : 'false');
+                    localStorage.setItem('isyrafAttendanceSavedNight', window.attendanceSavedNight ? 'true' : 'false');
                     window.forceRender = true;
                     updateAppLoop();
                 }
@@ -1226,6 +1639,19 @@
                         window.notesState = data.notes;
                         localStorage.setItem('isyrafNotes', JSON.stringify(window.notesState));
                     }
+                    if (data.missedReasons) {
+                        window.missedReasons = data.missedReasons;
+                        localStorage.setItem('isyrafMissedReasons', JSON.stringify(window.missedReasons));
+                    }
+                    if (Array.isArray(data.incidentNotes)) {
+                        window.incidentNotes = data.incidentNotes;
+                        localStorage.setItem('isyrafIncidentNotes', JSON.stringify(window.incidentNotes));
+                    }
+                    if (Array.isArray(data.handoverRecords)) {
+                        window.handoverRecords = data.handoverRecords;
+                        localStorage.setItem('isyrafHandoverRecords', JSON.stringify(window.handoverRecords));
+                    }
+                    renderMusyrifExtraCards();
                     window.forceRender = true;
                     updateAppLoop();
                 }
@@ -1472,7 +1898,8 @@
                     { id: 16, start: '17:35', end: '17:55', title: 'Makan, Piket & Mandi', keterangan: 'Makan sore dan persiapan Magrib.' },
                     { id: 17, start: '17:55', end: addMins(p.maghrib, 30), title: 'Salat Magrib & Zikir', keterangan: 'Jarak Azan-Ikamah 10 menit.' },
                     { id: 18, start: addMins(p.maghrib, 30), end: addMins(p.isya, 30), title: 'Halakah & Salat Isya', keterangan: 'Berhenti 10 menit setelah azan Isya untuk salat Isya.' },
-                    { id: 19, start: addMins(p.isya, 30), end: '21:15', title: 'Pengawasan Bakda Halakah', keterangan: 'Belajar mandiri santri di masjid.', noCheck: true }
+                    { id: 19, start: addMins(p.isya, 30), end: addMins(p.isya, 40), title: 'Istirahat Setelah Salat Isya', keterangan: 'Waktu awal disesuaikan dengan berakhirnya salat Isya, kemudian istirahat selama 10 menit.', noCheck: true },
+                    { id: 20, start: addMins(p.isya, 40), end: '21:15', title: 'Pengawasan Bakda Halakah', keterangan: 'Musyrif memastikan santri tetap melakukan aktivitas belajar mandiri atau persiapan pelajaran esok hari dan tidak berkeliaran di luar masjid.' }
                 );
             }
 
@@ -1591,22 +2018,165 @@
             }, 1000);
         };
 
+
+        // === PEDOMAN RINCI TUGAS MUSYRIF ===
+        const PEDOMAN_MUSYRIF = {"umum":[{"time":"03.50","note":"","taskHtml":"<p>Bangun tidur dan bersiap membangunkan para santri.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif harus bangun lebih dahulu daripada santri.</li><li>Maksimal pukul 03.55 musyrif sudah bangun.</li></ul>","search":"03.50 bangun tidur dan bersiap membangunkan para santri. musyrif harus bangun lebih dahulu daripada santri.\nmaksimal pukul 03.55 musyrif sudah bangun."},{"time":"04.00 s.d. 04.15","note":"","taskHtml":"<p>Membangunkan para santri dan mengarahkan mereka menuju masjid.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memastikan pada pukul 04.15 semua santri sudah bangun dan meninggalkan asrama.</li><li>Asrama dikunci dan tidak boleh ada santri yang kembali ke asrama.</li><li>Baik musyrif maupun santri dilarang tidur kembali.</li></ul>","search":"04.00 s.d. 04.15 membangunkan para santri dan mengarahkan mereka menuju masjid. musyrif memastikan pada pukul 04.15 semua santri sudah bangun dan meninggalkan asrama.\nasrama dikunci dan tidak boleh ada santri yang kembali ke asrama.\nbaik musyrif maupun santri dilarang tidur kembali."},{"time":"04.15 s.d. 04.50","note":"(berakhir menyesuaikan azan Subuh)","taskHtml":"<p>Mengarahkan, mengawasi, dan memastikan semua santri melaksanakan salat Tahajud, salat Witir, serta persiapan hafalan Al-Qur'an.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif mengawasi area WC untuk memastikan tidak ada santri yang tidur di teras masjid samping WC.</li><li>Salat Tahajud dilakukan minimal 4 rakaat dengan bacaan minimal setengah halaman. Salat Witir minimal 3 rakaat.</li><li>Izin ke WC dibatasi maksimal tiga santri pada waktu yang bersamaan.</li></ul>","search":"04.15 s.d. 04.50\n(berakhir menyesuaikan azan subuh) mengarahkan, mengawasi, dan memastikan semua santri melaksanakan salat tahajud, salat witir, serta persiapan hafalan al-qur'an. musyrif mengawasi area wc untuk memastikan tidak ada santri yang tidur di teras masjid samping wc.\nsalat tahajud dilakukan minimal 4 rakaat dengan bacaan minimal setengah halaman. salat witir minimal 3 rakaat.\nizin ke wc dibatasi maksimal tiga santri pada waktu yang bersamaan."},{"time":"04.50 s.d. 05.30","note":"(menyesuaikan berakhirnya salat Subuh)","taskHtml":"<p>Mengarahkan santri untuk menjawab azan, dilanjutkan salat sunah, berdoa, serta membaca Al-Qur'an.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Subuh dan ikamah maksimal 15 menit.</li><li>Perkiraan: 15 menit dari azan ke ikamah, 15 menit salat Subuh, dan 5 menit zikir selepas salat.</li></ul>","search":"04.50 s.d. 05.30\n(menyesuaikan berakhirnya salat subuh) mengarahkan santri untuk menjawab azan, dilanjutkan salat sunah, berdoa, serta membaca al-qur'an. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan subuh dan ikamah maksimal 15 menit.\nperkiraan: 15 menit dari azan ke ikamah, 15 menit salat subuh, dan 5 menit zikir selepas salat."},{"time":"05.30 s.d. 06.10","note":"(waktu berakhir pakem)","taskHtml":"<p>Mengarahkan santri membaca zikir setelah salat dan zikir pagi, serta mengampu halakah.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memastikan santri sudah berzikir sebelum halakah dimulai.</li><li>Halakah dimulai segera setelah zikir pagi tanpa harus menunggu pukul 05.30.</li><li>Selama halakah, santri tidak diizinkan kembali ke asrama.</li><li>Izin keluar dibatasi hanya satu orang, maksimal 2 menit.</li><li>Halakah selalu berakhir pukul 06.10.</li></ul>","search":"05.30 s.d. 06.10\n(waktu berakhir pakem) mengarahkan santri membaca zikir setelah salat dan zikir pagi, serta mengampu halakah. musyrif memastikan santri sudah berzikir sebelum halakah dimulai.\nhalakah dimulai segera setelah zikir pagi tanpa harus menunggu pukul 05.30.\nselama halakah, santri tidak diizinkan kembali ke asrama.\nizin keluar dibatasi hanya satu orang, maksimal 2 menit.\nhalakah selalu berakhir pukul 06.10."},{"time":"06.10 s.d. 07.00","note":"","taskHtml":"<p>Istirahat.</p>","detailHtml":"<p>Musyrif dapat menggunakan waktu ini untuk keperluan pribadi, tetapi tetap memantau ketenangan di lingkungan asrama.</p>","search":"06.10 s.d. 07.00 istirahat. musyrif dapat menggunakan waktu ini untuk keperluan pribadi, tetapi tetap memantau ketenangan di lingkungan asrama."},{"time":"07.00 s.d. 07.10","note":"","taskHtml":"<p>Mengarahkan santri untuk bersiap mengikuti muhadatsah dan masuk kelas.</p>","detailHtml":"<p>Musyrif mengingatkan santri untuk membawa seluruh perlengkapan sekolah agar tidak ada alasan untuk kembali ke asrama saat KBM berlangsung.</p>","search":"07.00 s.d. 07.10 mengarahkan santri untuk bersiap mengikuti muhadatsah dan masuk kelas. musyrif mengingatkan santri untuk membawa seluruh perlengkapan sekolah agar tidak ada alasan untuk kembali ke asrama saat kbm berlangsung."},{"time":"07.10 s.d. 07.20","note":"","taskHtml":"<p>Mendampingi dan mengawasi santri melaksanakan muhadatsah.</p>","detailHtml":"<p>Musyrif melakukan pendataan santri sebelum muhadtasah. Musyrif memastikan tidak ada santri yang absen.</p><p>Musyrif memastikan santri melaksanakan muhadatsah secara aktif. Kegiatan berakhir pukul 07.20, kemudian santri segera masuk kelas.</p>","search":"07.10 s.d. 07.20 mendampingi dan mengawasi santri melaksanakan muhadatsah. musyrif melakukan pendataan santri sebelum muhadtasah. musyrif memastikan tidak ada santri yang absen.\nmusyrif memastikan santri melaksanakan muhadatsah secara aktif. kegiatan berakhir pukul 07.20, kemudian santri segera masuk kelas."},{"time":"07.20 s.d. 15.00","note":"","taskHtml":"<p>Istirahat.</p>","detailHtml":"<p>Musyrif dapat beristirahat atau menunaikan keperluan pribadi selama santri mengikuti KBM, dengan tetap siap apabila dibutuhkan oleh pondok.</p>","search":"07.20 s.d. 15.00 istirahat. musyrif dapat beristirahat atau menunaikan keperluan pribadi selama santri mengikuti kbm, dengan tetap siap apabila dibutuhkan oleh pondok."},{"time":"15.00 s.d. 15.10","note":"","taskHtml":"<p>Mengarahkan santri menuju masjid.</p>","detailHtml":"<p>Seluruh musyrif dan santri sudah harus berada di masjid pada pukul 15.10. Asrama dikunci dan musyrif memastikan santri sudah membawa semua perlengkapan yang dibutuhkan.</p>","search":"15.00 s.d. 15.10 mengarahkan santri menuju masjid. seluruh musyrif dan santri sudah harus berada di masjid pada pukul 15.10. asrama dikunci dan musyrif memastikan santri sudah membawa semua perlengkapan yang dibutuhkan."},{"time":"15.10 s.d. 15.30","note":"(berakhir menyesuaikan azan Asar)","taskHtml":"<p>Mengarahkan santri mengambil wudu, dilanjutkan salat tahiyatul masjid, kemudian mempersiapkan hafalan.</p>","detailHtml":"<p>Musyrif mengawasi ketertiban di tempat wudu dan memastikan santri langsung menempati saf di dalam masjid tanpa mengobrol.</p>","search":"15.10 s.d. 15.30\n(berakhir menyesuaikan azan asar) mengarahkan santri mengambil wudu, dilanjutkan salat tahiyatul masjid, kemudian mempersiapkan hafalan. musyrif mengawasi ketertiban di tempat wudu dan memastikan santri langsung menempati saf di dalam masjid tanpa mengobrol."},{"time":"15.30 s.d. 15.50","note":"(menyesuaikan azan dan salat Asar)","taskHtml":"<ul class=\"detail-list\"><li>Mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Mengarahkan santri untuk melaksanakan salat Asar.</li><li>Mengarahkan santri membaca zikir setelah salat Asar dan zikir petang.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Asar dan ikamah maksimal 10 menit.</li><li>Perkiraan: 10 menit dari azan ke ikamah, 10 menit salat Asar, dan 5 menit zikir selepas salat.</li></ul>","search":"15.30 s.d. 15.50\n(menyesuaikan azan dan salat asar) mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmengarahkan santri untuk melaksanakan salat asar.\nmengarahkan santri membaca zikir setelah salat asar dan zikir petang. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan asar dan ikamah maksimal 10 menit.\nperkiraan: 10 menit dari azan ke ikamah, 10 menit salat asar, dan 5 menit zikir selepas salat."},{"time":"15.50 s.d. 16.15","note":"(selama 25 menit setelah salat Asar)","taskHtml":"<p>Mengawasi santri dan memastikan mereka membaca Al-Qur'an.</p>","detailHtml":"<p>Musyrif berkeliling untuk memastikan setiap santri benar-benar membaca Al-Qur'an dengan suara yang terdengar secara lirih dan tidak mengganggu yang lain.</p>","search":"15.50 s.d. 16.15\n(selama 25 menit setelah salat asar) mengawasi santri dan memastikan mereka membaca al-qur'an. musyrif berkeliling untuk memastikan setiap santri benar-benar membaca al-qur'an dengan suara yang terdengar secara lirih dan tidak mengganggu yang lain."},{"time":"16.15 s.d. 16.55","note":"(waktu berakhir pakem)","taskHtml":"<p>Mengampu halakah.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif fokus pada setoran hafalan santri.</li><li>Halakah bakda Asar dilaksanakan pada hari Senin, Rabu, dan Jumat.</li><li>Jika sedang waktu KBM, yaitu hari Selasa dan Kamis, musyrif diperbolehkan istirahat.</li><li>Halakah dimulai setelah 25 menit santri membaca Al-Qur'an.</li></ul>","search":"16.15 s.d. 16.55\n(waktu berakhir pakem) mengampu halakah. musyrif fokus pada setoran hafalan santri.\nhalakah bakda asar dilaksanakan pada hari senin, rabu, dan jumat.\njika sedang waktu kbm, yaitu hari selasa dan kamis, musyrif diperbolehkan istirahat.\nhalakah dimulai setelah 25 menit santri membaca al-qur'an."},{"time":"16.55 s.d. 17.35","note":"","taskHtml":"<p>Mengingatkan santri yang memiliki jadwal cucian untuk mencuci pakaiannya.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memantau area tempat cuci agar tetap tertib.</li><li>Jika sedang waktu KBM, yaitu hari Selasa dan Kamis, musyrif diperbolehkan istirahat.</li></ul>","search":"16.55 s.d. 17.35 mengingatkan santri yang memiliki jadwal cucian untuk mencuci pakaiannya. musyrif memantau area tempat cuci agar tetap tertib.\njika sedang waktu kbm, yaitu hari selasa dan kamis, musyrif diperbolehkan istirahat."},{"time":"17.35 s.d. 17.55","note":"","taskHtml":"<p>Mengingatkan santri untuk makan sore, piket kebersihan, dan mandi.</p>","detailHtml":"<p>Musyrif mengimbau santri agar makan dengan adab dan segera mandi setelah selesai makan atau melakukan tugas piket, agar siap sebelum waktu Magrib.</p>","search":"17.35 s.d. 17.55 mengingatkan santri untuk makan sore, piket kebersihan, dan mandi. musyrif mengimbau santri agar makan dengan adab dan segera mandi setelah selesai makan atau melakukan tugas piket, agar siap sebelum waktu magrib."},{"time":"17.55 s.d. 18.40","note":"(menyesuaikan berakhirnya salat Magrib)","taskHtml":"<ul class=\"detail-list\"><li>Mengingatkan santri bersiap menuju masjid untuk melaksanakan salat Magrib.</li><li>Mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Mengarahkan santri untuk melaksanakan salat Magrib.</li><li>Mengarahkan santri membaca zikir setelah salat Magrib.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Magrib dan ikamah maksimal 10 menit.</li><li>Perkiraan: 10 menit dari azan ke ikamah, 15 menit salat Magrib, dan 5 menit zikir selepas salat.</li></ul>","search":"17.55 s.d. 18.40\n(menyesuaikan berakhirnya salat magrib) mengingatkan santri bersiap menuju masjid untuk melaksanakan salat magrib.\nmengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmengarahkan santri untuk melaksanakan salat magrib.\nmengarahkan santri membaca zikir setelah salat magrib. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan magrib dan ikamah maksimal 10 menit.\nperkiraan: 10 menit dari azan ke ikamah, 15 menit salat magrib, dan 5 menit zikir selepas salat."},{"time":"18.40 s.d. 20.00","note":"(menyesuaikan Isya)","taskHtml":"<p>Mengampu dan melanjutkan halakah hafalan Al-Qur'an.</p>","detailHtml":"<ul class=\"detail-list\"><li>Saat masuk waktu Isya, musyrif menunjuk satu santri untuk azan. Setelah azan berkumandang, halakah dilanjutkan dan berhenti 10 menit setelah azan Isya. Setelah itu langsung melaksanakan salat berjemaah Isya.</li><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Waktu berakhir menyesuaikan masuknya waktu salat Isya ditambah 10 menit setelah azan, lalu salat 15 menit dan zikir 5 menit.</li></ul>","search":"18.40 s.d. 20.00\n(menyesuaikan isya) mengampu dan melanjutkan halakah hafalan al-qur'an. saat masuk waktu isya, musyrif menunjuk satu santri untuk azan. setelah azan berkumandang, halakah dilanjutkan dan berhenti 10 menit setelah azan isya. setelah itu langsung melaksanakan salat berjemaah isya.\nmusyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\nwaktu berakhir menyesuaikan masuknya waktu salat isya ditambah 10 menit setelah azan, lalu salat 15 menit dan zikir 5 menit."},{"time":"20.00 s.d. 20.10","note":"(menyesuaikan berakhirnya salat Isya)","taskHtml":"<p>Istirahat setelah salat Isya.</p>","detailHtml":"<p>Waktu awal disesuaikan dengan berakhirnya salat Isya, kemudian istirahat selama 10 menit.</p>","search":"20.00 s.d. 20.10\n(menyesuaikan berakhirnya salat isya) istirahat setelah salat isya. waktu awal disesuaikan dengan berakhirnya salat isya, kemudian istirahat selama 10 menit."},{"time":"20.10 s.d. 21.15","note":"(menyesuaikan berakhirnya istirahat)","taskHtml":"<p>Mengawasi santri dalam kegiatan bakda halakah.</p>","detailHtml":"<p>Musyrif memastikan santri tetap melakukan aktivitas belajar mandiri atau persiapan pelajaran esok hari dan tidak berkeliaran di luar masjid.</p>","search":"20.10 s.d. 21.15\n(menyesuaikan berakhirnya istirahat) mengawasi santri dalam kegiatan bakda halakah. musyrif memastikan santri tetap melakukan aktivitas belajar mandiri atau persiapan pelajaran esok hari dan tidak berkeliaran di luar masjid."},{"time":"21.15 s.d. 21.30","note":"","taskHtml":"<p>Memberikan nasihat dan melakukan refleksi bersama santri.</p>","detailHtml":"<p>Musyrif mengumpulkan santri dalam satu lingkaran untuk mengevaluasi kegiatan seharian dan memberikan motivasi sebelum tidur.</p>","search":"21.15 s.d. 21.30 memberikan nasihat dan melakukan refleksi bersama santri. musyrif mengumpulkan santri dalam satu lingkaran untuk mengevaluasi kegiatan seharian dan memberikan motivasi sebelum tidur."},{"time":"21.30 s.d. 22.00","note":"","taskHtml":"<p>Mengarahkan persiapan buku dan pakaian, melakukan pendataan santri, dan mengarahkan santri untuk tidur.</p>","detailHtml":"<p>Musyrif memastikan tidak ada santri yang absen dan semua santri sudah berada di ranjang masing-masing tepat pukul 22.00.</p>","search":"21.30 s.d. 22.00 mengarahkan persiapan buku dan pakaian, melakukan pendataan santri, dan mengarahkan santri untuk tidur. musyrif memastikan tidak ada santri yang absen dan semua santri sudah berada di ranjang masing-masing tepat pukul 22.00."},{"time":"22.00 s.d. 04.00","note":"","taskHtml":"<p>Musyrif tidur di asrama.</p>","detailHtml":"<p>Musyrif memastikan lampu asrama telah dipadamkan dan pintu-pintu akses telah terkunci demi keamanan bersama.</p>","search":"22.00 s.d. 04.00 musyrif tidur di asrama. musyrif memastikan lampu asrama telah dipadamkan dan pintu-pintu akses telah terkunci demi keamanan bersama."}],"sabtu":[{"time":"03.50","note":"","taskHtml":"<p>Bangun tidur dan bersiap membangunkan para santri.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif harus bangun lebih dahulu daripada santri.</li><li>Maksimal pukul 03.55 musyrif sudah bangun.</li></ul>","search":"03.50 bangun tidur dan bersiap membangunkan para santri. musyrif harus bangun lebih dahulu daripada santri.\nmaksimal pukul 03.55 musyrif sudah bangun."},{"time":"04.00 s.d. 04.15","note":"","taskHtml":"<p>Membangunkan para santri dan mengarahkan mereka menuju masjid.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memastikan pada pukul 04.15 semua santri sudah bangun dan meninggalkan asrama.</li><li>Asrama dikunci dan tidak boleh ada santri yang kembali ke asrama.</li><li>Baik musyrif maupun santri dilarang tidur kembali.</li></ul>","search":"04.00 s.d. 04.15 membangunkan para santri dan mengarahkan mereka menuju masjid. musyrif memastikan pada pukul 04.15 semua santri sudah bangun dan meninggalkan asrama.\nasrama dikunci dan tidak boleh ada santri yang kembali ke asrama.\nbaik musyrif maupun santri dilarang tidur kembali."},{"time":"04.15 s.d. 04.50","note":"(berakhir menyesuaikan azan Subuh)","taskHtml":"<p>Mengarahkan, mengawasi, dan memastikan semua santri melaksanakan salat Tahajud, salat Witir, serta persiapan hafalan Al-Qur'an.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif mengawasi area WC untuk memastikan tidak ada santri yang tidur di teras masjid samping WC.</li><li>Salat Tahajud dilakukan minimal 4 rakaat dengan bacaan minimal setengah halaman. Salat Witir minimal 3 rakaat.</li><li>Izin ke WC dibatasi maksimal tiga santri pada waktu yang bersamaan.</li></ul>","search":"04.15 s.d. 04.50\n(berakhir menyesuaikan azan subuh) mengarahkan, mengawasi, dan memastikan semua santri melaksanakan salat tahajud, salat witir, serta persiapan hafalan al-qur'an. musyrif mengawasi area wc untuk memastikan tidak ada santri yang tidur di teras masjid samping wc.\nsalat tahajud dilakukan minimal 4 rakaat dengan bacaan minimal setengah halaman. salat witir minimal 3 rakaat.\nizin ke wc dibatasi maksimal tiga santri pada waktu yang bersamaan."},{"time":"04.50 s.d. 05.30","note":"(menyesuaikan berakhirnya salat Subuh)","taskHtml":"<p>Mengarahkan santri untuk menjawab azan, dilanjutkan salat sunah, berdoa, serta membaca Al-Qur'an.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Subuh dan ikamah maksimal 15 menit.</li><li>Perkiraan: 15 menit dari azan ke ikamah, 15 menit salat Subuh, dan 5 menit zikir selepas salat.</li></ul>","search":"04.50 s.d. 05.30\n(menyesuaikan berakhirnya salat subuh) mengarahkan santri untuk menjawab azan, dilanjutkan salat sunah, berdoa, serta membaca al-qur'an. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan subuh dan ikamah maksimal 15 menit.\nperkiraan: 15 menit dari azan ke ikamah, 15 menit salat subuh, dan 5 menit zikir selepas salat."},{"time":"05.30 s.d. 06.10","note":"(waktu berakhir pakem)","taskHtml":"<p>Mengarahkan santri membaca zikir setelah salat dan zikir pagi, serta mengampu halakah.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memastikan santri sudah berzikir sebelum halakah dimulai.</li><li>Halakah dimulai segera setelah zikir pagi tanpa harus menunggu pukul 05.30.</li><li>Selama halakah, santri tidak diizinkan kembali ke asrama.</li><li>Izin keluar dibatasi hanya satu orang, maksimal 2 menit.</li><li>Halakah selalu berakhir pukul 06.10.</li></ul>","search":"05.30 s.d. 06.10\n(waktu berakhir pakem) mengarahkan santri membaca zikir setelah salat dan zikir pagi, serta mengampu halakah. musyrif memastikan santri sudah berzikir sebelum halakah dimulai.\nhalakah dimulai segera setelah zikir pagi tanpa harus menunggu pukul 05.30.\nselama halakah, santri tidak diizinkan kembali ke asrama.\nizin keluar dibatasi hanya satu orang, maksimal 2 menit.\nhalakah selalu berakhir pukul 06.10."},{"time":"06.10 s.d. 07.00","note":"","taskHtml":"<p>Istirahat.</p>","detailHtml":"<p>Musyrif dapat menggunakan waktu ini untuk keperluan pribadi, tetapi tetap memantau ketenangan di lingkungan asrama.</p>","search":"06.10 s.d. 07.00 istirahat. musyrif dapat menggunakan waktu ini untuk keperluan pribadi, tetapi tetap memantau ketenangan di lingkungan asrama."},{"time":"07.00 s.d. 07.10","note":"","taskHtml":"<p>Mengarahkan santri untuk bersiap mengikuti muhadatsah dan masuk kelas.</p>","detailHtml":"<p>Musyrif mengingatkan santri untuk membawa seluruh perlengkapan sekolah agar tidak ada alasan untuk kembali ke asrama saat KBM berlangsung.</p>","search":"07.00 s.d. 07.10 mengarahkan santri untuk bersiap mengikuti muhadatsah dan masuk kelas. musyrif mengingatkan santri untuk membawa seluruh perlengkapan sekolah agar tidak ada alasan untuk kembali ke asrama saat kbm berlangsung."},{"time":"07.10 s.d. 07.20","note":"","taskHtml":"<p>Mendampingi dan mengawasi santri melaksanakan muhadatsah.</p>","detailHtml":"<p>Musyrif melakukan pendataan santri sebelum muhadtasah. Musyrif memastikan tidak ada santri yang absen.</p><p>Musyrif memastikan santri melaksanakan muhadatsah secara aktif. Kegiatan berakhir pukul 07.20, kemudian santri segera masuk kelas.</p>","search":"07.10 s.d. 07.20 mendampingi dan mengawasi santri melaksanakan muhadatsah. musyrif melakukan pendataan santri sebelum muhadtasah. musyrif memastikan tidak ada santri yang absen.\nmusyrif memastikan santri melaksanakan muhadatsah secara aktif. kegiatan berakhir pukul 07.20, kemudian santri segera masuk kelas."},{"time":"07.20 s.d. 15.00","note":"","taskHtml":"<p>Istirahat.</p>","detailHtml":"<p>Musyrif dapat beristirahat atau menunaikan keperluan pribadi selama santri mengikuti KBM, dengan tetap siap apabila dibutuhkan oleh pondok.</p>","search":"07.20 s.d. 15.00 istirahat. musyrif dapat beristirahat atau menunaikan keperluan pribadi selama santri mengikuti kbm, dengan tetap siap apabila dibutuhkan oleh pondok."},{"time":"15.00 s.d. 15.10","note":"","taskHtml":"<p>Mengarahkan santri menuju masjid.</p>","detailHtml":"<p>Seluruh musyrif dan santri sudah harus berada di masjid pada pukul 15.10. Asrama dikunci dan musyrif memastikan santri sudah membawa semua perlengkapan yang dibutuhkan.</p>","search":"15.00 s.d. 15.10 mengarahkan santri menuju masjid. seluruh musyrif dan santri sudah harus berada di masjid pada pukul 15.10. asrama dikunci dan musyrif memastikan santri sudah membawa semua perlengkapan yang dibutuhkan."},{"time":"15.10 s.d. 15.30","note":"(berakhir menyesuaikan azan Asar)","taskHtml":"<p>Mengarahkan santri mengambil wudu, dilanjutkan salat tahiyatul masjid. Tidak ada persiapan hafalan karena santri libur halakah pada hari Sabtu sore.</p>","detailHtml":"<p>Musyrif mengawasi ketertiban di tempat wudu dan memastikan santri langsung menempati saf di dalam masjid tanpa mengobrol.</p>","search":"15.10 s.d. 15.30\n(berakhir menyesuaikan azan asar) mengarahkan santri mengambil wudu, dilanjutkan salat tahiyatul masjid. tidak ada persiapan hafalan karena santri libur halakah pada hari sabtu sore. musyrif mengawasi ketertiban di tempat wudu dan memastikan santri langsung menempati saf di dalam masjid tanpa mengobrol."},{"time":"15.30 s.d. 15.50","note":"(menyesuaikan azan dan salat Asar)","taskHtml":"<ul class=\"detail-list\"><li>Mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Mengarahkan santri untuk melaksanakan salat Asar.</li><li>Mengarahkan santri membaca zikir setelah salat Asar dan zikir petang.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Asar dan ikamah maksimal 10 menit.</li><li>Perkiraan: 10 menit dari azan ke ikamah, 10 menit salat Asar, dan 5 menit zikir selepas salat.</li></ul>","search":"15.30 s.d. 15.50\n(menyesuaikan azan dan salat asar) mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmengarahkan santri untuk melaksanakan salat asar.\nmengarahkan santri membaca zikir setelah salat asar dan zikir petang. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan asar dan ikamah maksimal 10 menit.\nperkiraan: 10 menit dari azan ke ikamah, 10 menit salat asar, dan 5 menit zikir selepas salat."},{"time":"15.50 s.d. 17.35","note":"(kegiatan bebas)","taskHtml":"<p>Mengawasi kegiatan sore santri.</p>","detailHtml":"<p>Karena kegiatan halakah ditiadakan, santri diperbolehkan berolahraga, mencuci, atau bersantai. Musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran.</p>","search":"15.50 s.d. 17.35\n(kegiatan bebas) mengawasi kegiatan sore santri. karena kegiatan halakah ditiadakan, santri diperbolehkan berolahraga, mencuci, atau bersantai. musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran."},{"time":"17.35 s.d. 17.55","note":"","taskHtml":"<p>Mengingatkan santri untuk makan sore, piket kebersihan, dan mandi.</p>","detailHtml":"<p>Musyrif mengimbau santri agar makan dengan adab dan segera mandi setelah selesai makan atau melakukan tugas piket, agar siap sebelum waktu Magrib.</p>","search":"17.35 s.d. 17.55 mengingatkan santri untuk makan sore, piket kebersihan, dan mandi. musyrif mengimbau santri agar makan dengan adab dan segera mandi setelah selesai makan atau melakukan tugas piket, agar siap sebelum waktu magrib."},{"time":"17.55 s.d. 18.40","note":"(menyesuaikan berakhirnya salat Magrib)","taskHtml":"<ul class=\"detail-list\"><li>Mengingatkan santri bersiap menuju masjid untuk melaksanakan salat Magrib.</li><li>Mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Mengarahkan santri untuk melaksanakan salat Magrib.</li><li>Mengarahkan santri membaca zikir setelah salat Magrib.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Magrib dan ikamah maksimal 10 menit.</li><li>Perkiraan: 10 menit dari azan ke ikamah, 15 menit salat Magrib, dan 5 menit zikir selepas salat.</li></ul>","search":"17.55 s.d. 18.40\n(menyesuaikan berakhirnya salat magrib) mengingatkan santri bersiap menuju masjid untuk melaksanakan salat magrib.\nmengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmengarahkan santri untuk melaksanakan salat magrib.\nmengarahkan santri membaca zikir setelah salat magrib. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan magrib dan ikamah maksimal 10 menit.\nperkiraan: 10 menit dari azan ke ikamah, 15 menit salat magrib, dan 5 menit zikir selepas salat."},{"time":"18.40 s.d. 20.00","note":"(kegiatan bebas di masjid; menyesuaikan Isya)","taskHtml":"<p>Mengawasi kegiatan bebas santri di masjid.</p>","detailHtml":"<ul class=\"detail-list\"><li>Karena kegiatan halakah ditiadakan, santri diperbolehkan bersantai. Musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran.</li><li>Saat masuk waktu Isya, musyrif mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Musyrif mengarahkan santri untuk melaksanakan salat Isya.</li><li>Musyrif mengarahkan santri membaca zikir setelah salat Isya.</li></ul>","search":"18.40 s.d. 20.00\n(kegiatan bebas di masjid; menyesuaikan isya) mengawasi kegiatan bebas santri di masjid. karena kegiatan halakah ditiadakan, santri diperbolehkan bersantai. musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran.\nsaat masuk waktu isya, musyrif mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmusyrif mengarahkan santri untuk melaksanakan salat isya.\nmusyrif mengarahkan santri membaca zikir setelah salat isya."},{"time":"20.00 s.d. 21.15","note":"(menyesuaikan berakhirnya salat Isya)","taskHtml":"<p>Istirahat atau kegiatan bebas terpantau setelah salat Isya.</p>","detailHtml":"<p>Waktu awal disesuaikan dengan berakhirnya salat Isya. Musyrif tetap memantau ketertiban santri sampai waktu refleksi malam.</p>","search":"20.00 s.d. 21.15\n(menyesuaikan berakhirnya salat isya) istirahat atau kegiatan bebas terpantau setelah salat isya. waktu awal disesuaikan dengan berakhirnya salat isya. musyrif tetap memantau ketertiban santri sampai waktu refleksi malam."},{"time":"21.15 s.d. 21.30","note":"","taskHtml":"<p>Memberikan nasihat dan melakukan refleksi bersama santri.</p>","detailHtml":"<p>Musyrif mengumpulkan santri dalam satu lingkaran untuk mengevaluasi kegiatan seharian dan memberikan motivasi sebelum tidur.</p>","search":"21.15 s.d. 21.30 memberikan nasihat dan melakukan refleksi bersama santri. musyrif mengumpulkan santri dalam satu lingkaran untuk mengevaluasi kegiatan seharian dan memberikan motivasi sebelum tidur."},{"time":"21.30 s.d. 22.00","note":"","taskHtml":"<p>Melakukan pendataan santri dan mengarahkan santri untuk tidur.</p>","detailHtml":"<p>Musyrif memastikan tidak ada santri yang absen dan semua santri sudah berada di ranjang masing-masing tepat pukul 22.00.</p>","search":"21.30 s.d. 22.00 melakukan pendataan santri dan mengarahkan santri untuk tidur. musyrif memastikan tidak ada santri yang absen dan semua santri sudah berada di ranjang masing-masing tepat pukul 22.00."},{"time":"22.00 s.d. 04.00","note":"","taskHtml":"<p>Musyrif tidur di asrama.</p>","detailHtml":"<p>Musyrif memastikan lampu asrama telah dipadamkan dan pintu-pintu akses telah terkunci demi keamanan bersama.</p>","search":"22.00 s.d. 04.00 musyrif tidur di asrama. musyrif memastikan lampu asrama telah dipadamkan dan pintu-pintu akses telah terkunci demi keamanan bersama."}],"ahad":[{"time":"03.50","note":"","taskHtml":"<p>Bangun tidur dan bersiap membangunkan para santri.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif harus bangun lebih dahulu daripada santri.</li><li>Maksimal pukul 03.55 musyrif sudah bangun.</li></ul>","search":"03.50 bangun tidur dan bersiap membangunkan para santri. musyrif harus bangun lebih dahulu daripada santri.\nmaksimal pukul 03.55 musyrif sudah bangun."},{"time":"04.00 s.d. 04.15","note":"","taskHtml":"<p>Membangunkan para santri dan mengarahkan mereka menuju masjid.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memastikan pada pukul 04.15 semua santri sudah bangun dan meninggalkan asrama.</li><li>Asrama dikunci dan tidak boleh ada santri yang kembali ke asrama.</li><li>Baik musyrif maupun santri dilarang tidur kembali.</li></ul>","search":"04.00 s.d. 04.15 membangunkan para santri dan mengarahkan mereka menuju masjid. musyrif memastikan pada pukul 04.15 semua santri sudah bangun dan meninggalkan asrama.\nasrama dikunci dan tidak boleh ada santri yang kembali ke asrama.\nbaik musyrif maupun santri dilarang tidur kembali."},{"time":"04.15 s.d. 04.50","note":"(berakhir menyesuaikan azan Subuh)","taskHtml":"<p>Mengarahkan, mengawasi, dan memastikan semua santri melaksanakan salat Tahajud dan salat Witir. Tidak ada persiapan hafalan Al-Qur'an karena hari Ahad libur halakah.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif mengawasi area WC untuk memastikan tidak ada santri yang tidur di teras masjid samping WC.</li><li>Salat Tahajud dilakukan minimal 4 rakaat dengan bacaan minimal setengah halaman. Salat Witir minimal 3 rakaat.</li><li>Izin ke WC dibatasi maksimal tiga santri pada waktu yang bersamaan.</li></ul>","search":"04.15 s.d. 04.50\n(berakhir menyesuaikan azan subuh) mengarahkan, mengawasi, dan memastikan semua santri melaksanakan salat tahajud dan salat witir. tidak ada persiapan hafalan al-qur'an karena hari ahad libur halakah. musyrif mengawasi area wc untuk memastikan tidak ada santri yang tidur di teras masjid samping wc.\nsalat tahajud dilakukan minimal 4 rakaat dengan bacaan minimal setengah halaman. salat witir minimal 3 rakaat.\nizin ke wc dibatasi maksimal tiga santri pada waktu yang bersamaan."},{"time":"04.50 s.d. 05.30","note":"(menyesuaikan berakhirnya salat Subuh)","taskHtml":"<p>Mengarahkan santri untuk menjawab azan, dilanjutkan salat sunah, berdoa, serta membaca Al-Qur'an.</p>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Subuh dan ikamah maksimal 15 menit.</li><li>Perkiraan: 15 menit dari azan ke ikamah, 15 menit salat Subuh, dan 5 menit zikir selepas salat.</li></ul>","search":"04.50 s.d. 05.30\n(menyesuaikan berakhirnya salat subuh) mengarahkan santri untuk menjawab azan, dilanjutkan salat sunah, berdoa, serta membaca al-qur'an. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan subuh dan ikamah maksimal 15 menit.\nperkiraan: 15 menit dari azan ke ikamah, 15 menit salat subuh, dan 5 menit zikir selepas salat."},{"time":"05.30 s.d. 07.30","note":"(waktu berakhir pakem)","taskHtml":"<ul class=\"detail-list\"><li>Mengarahkan santri membaca zikir setelah salat dan zikir pagi.</li><li>Memimpin dan mengawasi jalannya kerja bakti.</li></ul>","detailHtml":"<p>Kegiatan halakah pagi diganti dengan kerja bakti. Musyrif membagi area tugas, seperti area masjid, asrama, halaman, atau tempat wudu, dan memastikan semua santri ikut berpartisipasi membersihkan lingkungan hingga pukul 07.30.</p>","search":"05.30 s.d. 07.30\n(waktu berakhir pakem) mengarahkan santri membaca zikir setelah salat dan zikir pagi.\nmemimpin dan mengawasi jalannya kerja bakti. kegiatan halakah pagi diganti dengan kerja bakti. musyrif membagi area tugas, seperti area masjid, asrama, halaman, atau tempat wudu, dan memastikan semua santri ikut berpartisipasi membersihkan lingkungan hingga pukul 07.30."},{"time":"07.30 s.d. 11.30","note":"","taskHtml":"<p>Mengawasi waktu bebas pagi santri.</p>","detailHtml":"<p>Setelah kerja bakti, kegiatan santri bebas, seperti olahraga, ekstrakurikuler, mencuci, dan kegiatan lain yang diizinkan. Musyrif memantau lingkungan pondok untuk memastikan keamanan dan ketertiban.</p>","search":"07.30 s.d. 11.30 mengawasi waktu bebas pagi santri. setelah kerja bakti, kegiatan santri bebas, seperti olahraga, ekstrakurikuler, mencuci, dan kegiatan lain yang diizinkan. musyrif memantau lingkungan pondok untuk memastikan keamanan dan ketertiban."},{"time":"11.30 s.d. 12.00","note":"(10 menit sebelum azan Zuhur sudah di masjid)","taskHtml":"<ul class=\"detail-list\"><li>Memastikan santri menghentikan seluruh aktivitas bebasnya.</li><li>Mengarahkan santri ke masjid untuk salat Zuhur berjemaah.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif memastikan santri menghentikan seluruh aktivitas bebasnya, mandi atau membersihkan diri jika kotor, dan bersiap menuju masjid.</li><li>Seluruh santri sudah berada di masjid 10 menit sebelum azan Zuhur.</li><li>Asrama dikunci saat waktu salat.</li></ul>","search":"11.30 s.d. 12.00\n(10 menit sebelum azan zuhur sudah di masjid) memastikan santri menghentikan seluruh aktivitas bebasnya.\nmengarahkan santri ke masjid untuk salat zuhur berjemaah. musyrif memastikan santri menghentikan seluruh aktivitas bebasnya, mandi atau membersihkan diri jika kotor, dan bersiap menuju masjid.\nseluruh santri sudah berada di masjid 10 menit sebelum azan zuhur.\nasrama dikunci saat waktu salat."},{"time":"12.40 s.d. 15.00","note":"","taskHtml":"<p>Istirahat dan makan siang santri.</p>","detailHtml":"<p>Waktu bebas hingga persiapan salat Asar.</p>","search":"12.40 s.d. 15.00 istirahat dan makan siang santri. waktu bebas hingga persiapan salat asar."},{"time":"15.00 s.d. 15.10","note":"","taskHtml":"<p>Mengarahkan santri menuju masjid.</p>","detailHtml":"<p>Seluruh musyrif dan santri sudah harus berada di masjid pada pukul 15.10. Asrama dikunci dan musyrif memastikan santri sudah membawa semua perlengkapan yang dibutuhkan.</p>","search":"15.00 s.d. 15.10 mengarahkan santri menuju masjid. seluruh musyrif dan santri sudah harus berada di masjid pada pukul 15.10. asrama dikunci dan musyrif memastikan santri sudah membawa semua perlengkapan yang dibutuhkan."},{"time":"15.10 s.d. 15.30","note":"(berakhir menyesuaikan azan Asar)","taskHtml":"<p>Mengarahkan santri mengambil wudu, dilanjutkan salat tahiyatul masjid. Tidak ada persiapan hafalan karena santri libur halakah pada hari Ahad sore.</p>","detailHtml":"<p>Musyrif mengawasi ketertiban di tempat wudu dan memastikan santri langsung menempati saf di dalam masjid tanpa mengobrol.</p>","search":"15.10 s.d. 15.30\n(berakhir menyesuaikan azan asar) mengarahkan santri mengambil wudu, dilanjutkan salat tahiyatul masjid. tidak ada persiapan hafalan karena santri libur halakah pada hari ahad sore. musyrif mengawasi ketertiban di tempat wudu dan memastikan santri langsung menempati saf di dalam masjid tanpa mengobrol."},{"time":"15.30 s.d. 15.50","note":"(menyesuaikan azan dan salat Asar)","taskHtml":"<ul class=\"detail-list\"><li>Mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Mengarahkan santri untuk melaksanakan salat Asar.</li><li>Mengarahkan santri membaca zikir setelah salat Asar dan zikir petang.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Asar dan ikamah maksimal 10 menit.</li><li>Perkiraan: 10 menit dari azan ke ikamah, 10 menit salat Asar, dan 5 menit zikir selepas salat.</li></ul>","search":"15.30 s.d. 15.50\n(menyesuaikan azan dan salat asar) mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmengarahkan santri untuk melaksanakan salat asar.\nmengarahkan santri membaca zikir setelah salat asar dan zikir petang. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan asar dan ikamah maksimal 10 menit.\nperkiraan: 10 menit dari azan ke ikamah, 10 menit salat asar, dan 5 menit zikir selepas salat."},{"time":"15.50 s.d. 17.35","note":"(kegiatan bebas)","taskHtml":"<p>Mengawasi kegiatan sore santri.</p>","detailHtml":"<ul class=\"detail-list\"><li>Jika ada kajian bakda Asar pada hari Ahad, musyrif mengarahkan santri untuk mengikuti kajian.</li><li>Karena kegiatan halakah ditiadakan, santri diperbolehkan berolahraga, mencuci, atau bersantai. Musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran.</li></ul>","search":"15.50 s.d. 17.35\n(kegiatan bebas) mengawasi kegiatan sore santri. jika ada kajian bakda asar pada hari ahad, musyrif mengarahkan santri untuk mengikuti kajian.\nkarena kegiatan halakah ditiadakan, santri diperbolehkan berolahraga, mencuci, atau bersantai. musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran."},{"time":"17.35 s.d. 17.55","note":"","taskHtml":"<p>Mengingatkan santri untuk makan sore, piket kebersihan, dan mandi.</p>","detailHtml":"<p>Musyrif mengimbau santri agar makan dengan adab dan segera mandi setelah selesai makan atau melakukan tugas piket, agar siap sebelum waktu Magrib.</p>","search":"17.35 s.d. 17.55 mengingatkan santri untuk makan sore, piket kebersihan, dan mandi. musyrif mengimbau santri agar makan dengan adab dan segera mandi setelah selesai makan atau melakukan tugas piket, agar siap sebelum waktu magrib."},{"time":"17.55 s.d. 18.40","note":"(menyesuaikan berakhirnya salat Magrib)","taskHtml":"<ul class=\"detail-list\"><li>Mengingatkan santri bersiap menuju masjid untuk melaksanakan salat Magrib.</li><li>Mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Mengarahkan santri untuk melaksanakan salat Magrib.</li><li>Mengarahkan santri membaca zikir setelah salat Magrib.</li></ul>","detailHtml":"<ul class=\"detail-list\"><li>Musyrif tetap berada di masjid dan tidak kembali ke asrama.</li><li>Musyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.</li><li>Jarak antara azan Magrib dan ikamah maksimal 10 menit.</li><li>Perkiraan: 10 menit dari azan ke ikamah, 15 menit salat Magrib, dan 5 menit zikir selepas salat.</li></ul>","search":"17.55 s.d. 18.40\n(menyesuaikan berakhirnya salat magrib) mengingatkan santri bersiap menuju masjid untuk melaksanakan salat magrib.\nmengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmengarahkan santri untuk melaksanakan salat magrib.\nmengarahkan santri membaca zikir setelah salat magrib. musyrif tetap berada di masjid dan tidak kembali ke asrama.\nmusyrif memastikan santri memenuhi saf awal terlebih dahulu sebelum mengisi saf selanjutnya.\njarak antara azan magrib dan ikamah maksimal 10 menit.\nperkiraan: 10 menit dari azan ke ikamah, 15 menit salat magrib, dan 5 menit zikir selepas salat."},{"time":"18.40 s.d. 20.00","note":"(kegiatan bebas di masjid; menyesuaikan Isya)","taskHtml":"<p>Mengawasi kegiatan bebas santri di masjid.</p>","detailHtml":"<ul class=\"detail-list\"><li>Karena kegiatan halakah ditiadakan, santri diperbolehkan bersantai. Musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran.</li><li>Jika ada kajian bakda Magrib, musyrif mengarahkan santri untuk mengikuti kajian.</li><li>Saat masuk waktu Isya, musyrif mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca Al-Qur'an.</li><li>Musyrif mengarahkan santri untuk melaksanakan salat Isya.</li><li>Musyrif mengarahkan santri membaca zikir setelah salat Isya.</li></ul>","search":"18.40 s.d. 20.00\n(kegiatan bebas di masjid; menyesuaikan isya) mengawasi kegiatan bebas santri di masjid. karena kegiatan halakah ditiadakan, santri diperbolehkan bersantai. musyrif tetap memantau area ma'had untuk memastikan tidak ada santri yang keluar dari batas wilayah yang diizinkan atau melakukan pelanggaran.\njika ada kajian bakda magrib, musyrif mengarahkan santri untuk mengikuti kajian.\nsaat masuk waktu isya, musyrif mengarahkan santri untuk menjawab azan, salat sunah, berdoa, serta membaca al-qur'an.\nmusyrif mengarahkan santri untuk melaksanakan salat isya.\nmusyrif mengarahkan santri membaca zikir setelah salat isya."},{"time":"20.00 s.d. 21.15","note":"(menyesuaikan berakhirnya salat Isya)","taskHtml":"<p>Istirahat atau kegiatan bebas terpantau setelah salat Isya.</p>","detailHtml":"<p>Waktu awal disesuaikan dengan berakhirnya salat Isya. Musyrif tetap memantau ketertiban santri sampai waktu refleksi malam.</p>","search":"20.00 s.d. 21.15\n(menyesuaikan berakhirnya salat isya) istirahat atau kegiatan bebas terpantau setelah salat isya. waktu awal disesuaikan dengan berakhirnya salat isya. musyrif tetap memantau ketertiban santri sampai waktu refleksi malam."},{"time":"21.15 s.d. 21.30","note":"","taskHtml":"<p>Memberikan nasihat dan melakukan refleksi bersama santri.</p>","detailHtml":"<p>Musyrif mengumpulkan santri dalam satu lingkaran untuk mengevaluasi kegiatan seharian dan memberikan motivasi sebelum tidur.</p>","search":"21.15 s.d. 21.30 memberikan nasihat dan melakukan refleksi bersama santri. musyrif mengumpulkan santri dalam satu lingkaran untuk mengevaluasi kegiatan seharian dan memberikan motivasi sebelum tidur."},{"time":"21.30 s.d. 22.00","note":"","taskHtml":"<p>Melakukan pendataan santri dan mengarahkan santri untuk tidur.</p>","detailHtml":"<p>Musyrif memastikan tidak ada santri yang absen dan semua santri sudah berada di ranjang masing-masing tepat pukul 22.00.</p>","search":"21.30 s.d. 22.00 melakukan pendataan santri dan mengarahkan santri untuk tidur. musyrif memastikan tidak ada santri yang absen dan semua santri sudah berada di ranjang masing-masing tepat pukul 22.00."},{"time":"22.00 s.d. 04.00","note":"","taskHtml":"<p>Musyrif tidur di asrama.</p>","detailHtml":"<p>Musyrif memastikan lampu asrama telah dipadamkan dan pintu-pintu akses telah terkunci demi keamanan bersama.</p>","search":"22.00 s.d. 04.00 musyrif tidur di asrama. musyrif memastikan lampu asrama telah dipadamkan dan pintu-pintu akses telah terkunci demi keamanan bersama."}]};
+        window.currentPedomanDay = 'umum';
+
+        function pedomanPlainText(htmlText) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = htmlText || '';
+            return (tmp.textContent || tmp.innerText || '').trim();
+        }
+
+        window.renderPedomanMusyrif = function() {
+            const container = document.getElementById('pedomanContainer');
+            if (!container) return;
+            const day = window.currentPedomanDay || 'umum';
+            const q = (document.getElementById('pedomanSearch')?.value || '').trim().toLowerCase();
+            const list = PEDOMAN_MUSYRIF[day] || [];
+            const filtered = list.filter(item => {
+                const hay = `${item.time} ${item.note} ${item.search} ${pedomanPlainText(item.taskHtml)} ${pedomanPlainText(item.detailHtml)}`.toLowerCase();
+                return !q || hay.includes(q);
+            });
+
+            const labels = { umum:'Jadwal Umum', sabtu:'Jadwal Khusus Sabtu', ahad:'Jadwal Khusus Ahad' };
+            const title = document.getElementById('pedomanSectionTitle');
+            const count = document.getElementById('pedomanCount');
+            if (title) title.textContent = labels[day];
+            if (count) count.textContent = `${filtered.length} kegiatan`;
+
+            ['umum','sabtu','ahad'].forEach(k => {
+                const b = document.getElementById('ped-day-' + k);
+                if (!b) return;
+                b.classList.toggle('active', k === day);
+            });
+
+            if (!filtered.length) {
+                container.innerHTML = `<div class="ped-empty rounded-[2rem] p-8 text-center"><i class="fas fa-search text-2xl text-slate-300 mb-3"></i><p class="text-[12px] font-bold text-slate-500">Tidak ada tugas yang cocok dengan pencarian.</p></div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map((item, idx) => `
+                <article class="ped-card rounded-[2rem] p-5 transition-all duration-300">
+                    <div class="flex items-start gap-3 mb-4">
+                        <div class="w-9 h-9 shrink-0 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-[11px] shadow-sm">${String(idx+1).padStart(2,'0')}</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="ped-time inline-flex flex-wrap items-center gap-1.5 rounded-xl px-3 py-2 mb-2 text-[11px] font-black text-blue-800">
+                                <i class="far fa-clock text-blue-500"></i><span>${item.time}</span>${item.note ? `<span class="font-bold text-slate-500">${item.note}</span>` : ''}
+                            </div>
+                            <div class="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400 mb-1">Tugas</div>
+                            <div class="text-[13px] font-extrabold text-blue-950 leading-relaxed">${item.taskHtml}</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50/90 border border-slate-100 rounded-[1.4rem] p-4">
+                        <div class="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-600 mb-2"><i class="fas fa-info-circle mr-1"></i> Keterangan</div>
+                        <div class="text-[12px] font-semibold text-slate-600 leading-relaxed">${item.detailHtml}</div>
+                    </div>
+                </article>`).join('');
+        };
+
+        window.setPedomanDay = function(day) {
+            if (!PEDOMAN_MUSYRIF[day]) return;
+            window.currentPedomanDay = day;
+            window.renderPedomanMusyrif();
+        };
+
+        window.filterPedoman = function() { window.renderPedomanMusyrif(); };
+
+        window.initPedomanDay = function() {
+            const day = new Date().getDay();
+            window.currentPedomanDay = day === 0 ? 'ahad' : (day === 6 ? 'sabtu' : 'umum');
+            window.renderPedomanMusyrif();
+        };
+
         window.switchTab = (tab) => {
             document.getElementById('view-dashboard').classList.toggle('hidden', tab !== 'dashboard');
             document.getElementById('view-ceklis').classList.toggle('hidden', tab !== 'ceklis');
             document.getElementById('view-absensi').classList.toggle('hidden', tab !== 'absensi');
+            document.getElementById('view-pedoman').classList.toggle('hidden', tab !== 'pedoman');
             
-            const act = 'flex-1 py-3.5 text-center text-[13px] font-extrabold bg-white text-blue-800 rounded-[1.8rem] shadow-sm transition-all duration-300';
-            const inact = 'flex-1 py-3.5 text-center text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]';
+            const act = 'flex-1 py-3.5 text-center text-[12px] font-extrabold bg-white text-blue-800 rounded-[1.8rem] shadow-sm transition-all duration-300';
+            const inact = 'flex-1 py-3.5 text-center text-[12px] font-bold text-slate-500 hover:text-slate-800 transition-all duration-300 rounded-[1.8rem]';
             
             document.getElementById('tab-dashboard').className = tab === 'dashboard' ? act : inact;
             document.getElementById('tab-ceklis').className = tab === 'ceklis' ? act : inact;
-            
-            const tabAbsensi = document.getElementById('tab-absensi');
-            if (tabAbsensi) {
-                tabAbsensi.className = tab === 'absensi' ? act : inact;
-            }
+            document.getElementById('tab-absensi').className = tab === 'absensi' ? act : inact;
+            document.getElementById('tab-pedoman').className = tab === 'pedoman' ? act : inact;
+            if (tab === 'pedoman') window.initPedomanDay();
         };
+
+        function updateAbsensiReminder(now = new Date()) {
+            const card = document.getElementById('absensiReminderCard');
+            const morningBadge = document.getElementById('absensiMorningStatus');
+            const nightBadge = document.getElementById('absensiNightStatus');
+            const message = document.getElementById('absensiReminderMessage');
+            if (!card || !morningBadge || !nightBadge || !message) return;
+
+            const mins = now.getHours() * 60 + now.getMinutes();
+            const morningStart = 7 * 60 + 10;   // 07.10
+            const morningEnd = 7 * 60 + 20;     // 07.20
+            const nightStart = 21 * 60 + 30;     // 21.30
+            const nightEnd = 22 * 60;            // 22.00
+            const warningMinutes = 10;
+
+            const badgeClass = {
+                waiting: 'text-[9px] font-black px-2 py-1 rounded-lg bg-slate-100 text-slate-500',
+                soon: 'text-[9px] font-black px-2 py-1 rounded-lg bg-amber-100 text-amber-700 animate-pulse',
+                active: 'text-[9px] font-black px-2 py-1 rounded-lg bg-rose-100 text-rose-700 animate-pulse',
+                done: 'text-[9px] font-black px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700',
+                missed: 'text-[9px] font-black px-2 py-1 rounded-lg bg-rose-100 text-rose-600'
+            };
+
+            function getState(start, end, saved) {
+                if (saved) return { key: 'done', label: 'SELESAI' };
+                if (mins >= start && mins <= end) return { key: 'active', label: 'SEKARANG' };
+                if (mins >= start - warningMinutes && mins < start) return { key: 'soon', label: 'SEBENTAR LAGI' };
+                if (mins > end) return { key: 'missed', label: 'TERLEWAT' };
+                return { key: 'waiting', label: 'BELUM' };
+            }
+
+            const morning = getState(morningStart, morningEnd, window.attendanceSavedMorning);
+            const night = getState(nightStart, nightEnd, window.attendanceSavedNight);
+
+            morningBadge.className = badgeClass[morning.key];
+            morningBadge.textContent = morning.label;
+            nightBadge.className = badgeClass[night.key];
+            nightBadge.textContent = night.label;
+
+            card.classList.remove('border-rose-300', 'ring-2', 'ring-rose-200', 'border-amber-300', 'ring-amber-100');
+            message.className = 'mt-3 text-[11px] font-bold rounded-xl px-3 py-2.5 leading-relaxed border';
+
+            if (morning.key === 'active') {
+                card.classList.add('border-rose-300', 'ring-2', 'ring-rose-200');
+                message.classList.add('text-rose-700', 'bg-rose-50', 'border-rose-200');
+                message.innerHTML = '<i class="fas fa-bell mr-1.5 animate-pulse"></i><strong>Waktunya absensi pagi.</strong> Buka menu Absensi dan simpan data sebelum pukul 07.20.';
+            } else if (night.key === 'active') {
+                card.classList.add('border-rose-300', 'ring-2', 'ring-rose-200');
+                message.classList.add('text-rose-700', 'bg-rose-50', 'border-rose-200');
+                message.innerHTML = '<i class="fas fa-bell mr-1.5 animate-pulse"></i><strong>Waktunya absensi malam.</strong> Buka menu Absensi dan simpan data sebelum pukul 22.00.';
+            } else if (morning.key === 'soon') {
+                card.classList.add('border-amber-300', 'ring-2', 'ring-amber-100');
+                message.classList.add('text-amber-700', 'bg-amber-50', 'border-amber-200');
+                message.innerHTML = '<i class="fas fa-clock mr-1.5"></i>Absensi pagi dimulai pukul <strong>07.10</strong>. Persiapkan pendataan santri.';
+            } else if (night.key === 'soon') {
+                card.classList.add('border-amber-300', 'ring-2', 'ring-amber-100');
+                message.classList.add('text-amber-700', 'bg-amber-50', 'border-amber-200');
+                message.innerHTML = '<i class="fas fa-clock mr-1.5"></i>Absensi malam dimulai pukul <strong>21.30</strong>. Persiapkan pendataan santri.';
+            } else if (morning.key === 'missed' && mins < nightStart - warningMinutes) {
+                message.classList.add('text-rose-600', 'bg-rose-50', 'border-rose-100');
+                message.innerHTML = '<i class="fas fa-exclamation-circle mr-1.5"></i>Absensi pagi belum tersimpan. Jadwal absensi berikutnya: <strong>21.30–22.00</strong>.';
+            } else if (night.key === 'missed') {
+                message.classList.add('text-rose-600', 'bg-rose-50', 'border-rose-100');
+                message.innerHTML = '<i class="fas fa-exclamation-circle mr-1.5"></i>Waktu absensi malam telah berakhir dan data belum tersimpan.';
+            } else if (morning.key === 'done' && night.key === 'done') {
+                message.classList.add('text-emerald-700', 'bg-emerald-50', 'border-emerald-100');
+                message.innerHTML = '<i class="fas fa-check-circle mr-1.5"></i>Absensi pagi dan malam hari ini sudah selesai.';
+            } else {
+                message.classList.add('text-slate-500', 'bg-slate-50', 'border-slate-100');
+                message.innerHTML = 'Absensi dilakukan pagi pukul <strong>07.10–07.20</strong> dan malam pukul <strong>21.30–22.00</strong>.';
+            }
+        }
 
         function updateAppLoop() {
             const now = new Date();
@@ -1619,6 +2189,7 @@
                 const date = document.getElementById('currentDateMusyrif');
                 if(clock) clock.innerText = timeStr;
                 if(date) date.innerHTML = `${dateStr} <i class="fas fa-satellite-dish ml-1 opacity-70"></i>`;
+                updateAbsensiReminder(now);
 
                 if (window.forceRender || window.lastRenderTime !== currentMinStr) {
                     if (window.activeEditors.size === 0) {
@@ -1689,6 +2260,9 @@
                     location: "Asrama PP Nurul Ilmi",
                     checklist: window.checklistState,
                     notes: window.notesState,
+                    missedReasons: window.missedReasons,
+                    incidentNotes: window.incidentNotes,
+                    handoverRecords: window.handoverRecords,
                     lastUpdate: serverTimestamp()
                 }, { merge: true });
             } catch (error) {
@@ -1719,6 +2293,43 @@
             await saveDataToFirebase();
             window.forceRender = true;
             updateAppLoop();
+        };
+
+
+        window.toggleMissedReasonEditor = function(taskId) {
+            const key = `reason-${taskId}`;
+            const editor = document.getElementById(`missed-reason-editor-${taskId}`);
+            if (!editor) return;
+            if (editor.classList.contains('hidden')) {
+                editor.classList.remove('hidden');
+                window.activeEditors.add(key);
+            } else {
+                editor.classList.add('hidden');
+                window.activeEditors.delete(key);
+            }
+        };
+
+        window.saveMissedReason = async function(taskId) {
+            const select = document.getElementById(`missed-reason-select-${taskId}`);
+            const detailInput = document.getElementById(`missed-reason-detail-${taskId}`);
+            if (!select || !detailInput) return;
+            const reason = select.value;
+            const detail = detailInput.value.trim();
+            if (!reason) return showToast("Pilih alasan tugas tidak terlaksana.", "error");
+            if (reason === 'Lainnya' && !detail) return showToast("Tuliskan keterangan untuk alasan lainnya.", "error");
+
+            const now = new Date();
+            window.missedReasons[taskId] = {
+                reason,
+                detail,
+                time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+            };
+            localStorage.setItem('isyrafMissedReasons', JSON.stringify(window.missedReasons));
+            await saveDataToFirebase();
+            window.activeEditors.delete(`reason-${taskId}`);
+            window.forceRender = true;
+            updateAppLoop();
+            showToast("Alasan tugas terlewat berhasil disimpan.", "success");
         };
 
         window.toggleKeterangan = function(taskId) {
@@ -1771,9 +2382,10 @@
             const name = nameInput.value.trim();
             if(name && !window.daftarSantri.includes(name) && currentRoomId) {
                 window.daftarSantri.push(name);
-                window.attendanceState[name] = 'H';
+                window.attendanceMorningState[name] = 'H';
+                window.attendanceNightState[name] = 'H';
                 localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
-                localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+                window.persistAttendanceStates();
                 nameInput.value = '';
                 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
@@ -1790,9 +2402,10 @@
             if(!currentRoomId) return;
             if(confirm(`Yakin ingin menghapus ${name} dari kamar?`)) {
                 window.daftarSantri = window.daftarSantri.filter(s => s !== name);
-                delete window.attendanceState[name];
+                delete window.attendanceMorningState[name];
+                delete window.attendanceNightState[name];
                 localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
-                localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+                window.persistAttendanceStates();
                 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                 await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
@@ -1814,10 +2427,12 @@
                 const index = window.daftarSantri.indexOf(oldName);
                 if (index !== -1) {
                     window.daftarSantri[index] = cleanName;
-                    window.attendanceState[cleanName] = window.attendanceState[oldName];
-                    delete window.attendanceState[oldName];
+                    window.attendanceMorningState[cleanName] = window.attendanceMorningState[oldName] || 'H';
+                    window.attendanceNightState[cleanName] = window.attendanceNightState[oldName] || 'H';
+                    delete window.attendanceMorningState[oldName];
+                    delete window.attendanceNightState[oldName];
                     localStorage.setItem('isyrafSantri', JSON.stringify(window.daftarSantri));
-                    localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+                    window.persistAttendanceStates();
                     
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                     await setDoc(roomRef, { santri: window.daftarSantri }, { merge: true });
@@ -1829,36 +2444,40 @@
         };
 
         window.setAbsensi = async function(name, status) {
-            window.attendanceState[name] = status;
-            localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+            const session = window.getAbsensiSession(new Date(), false);
+            if (!session) return showToast("Perubahan absensi hanya dapat dilakukan pada jadwal absensi.", "error");
+            const state = window.getAttendanceStateForSession(session);
+            state[name] = status;
+            window.persistAttendanceStates();
             renderAbsensiUI();
         };
 
         window.simpanAbsensiKeDB = async function() {
             if(!currentRoomId) return showToast("Anda belum ditugaskan ke Kamar manapun!", "error");
 
+            const session = window.getAbsensiSession(new Date(), false);
+            if (!session) return showToast("Saat ini di luar waktu absensi.", "error");
+
             const btn = document.getElementById('btnSimpanAbsen');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...';
-            btn.disabled = true;
-            
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...';
+                btn.disabled = true;
+            }
+
+            const activeState = window.getAttendanceStateForSession(session);
             window.daftarSantri.forEach(name => {
-                if (!window.attendanceState[name]) {
-                    window.attendanceState[name] = 'H';
-                }
+                if (!activeState[name]) activeState[name] = 'H';
             });
-            localStorage.setItem('isyrafAttendance', JSON.stringify(window.attendanceState));
+            window.persistAttendanceStates();
 
             let sm = window.attendanceSavedMorning;
             let sn = window.attendanceSavedNight;
-
-            const now = new Date();
-            const mins = now.getHours() * 60 + now.getMinutes();
-            if (mins >= 430 && mins <= 440) {
+            if (session === 'morning') {
                 sm = true;
                 window.attendanceSavedMorning = true;
                 localStorage.setItem('isyrafAttendanceSavedMorning', 'true');
-            } else if (mins >= 1290 && mins <= 1320) {
+            } else {
                 sn = true;
                 window.attendanceSavedNight = true;
                 localStorage.setItem('isyrafAttendanceSavedNight', 'true');
@@ -1867,15 +2486,21 @@
             try {
                 const colName = 'room_states_' + window.getYYYYMMDD();
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', colName, currentRoomId);
-                await setDoc(roomRef, {
-                    attendance: window.attendanceState,
+                const payload = {
                     savedMorning: sm,
                     savedNight: sn,
+                    lastAttendanceSession: session,
                     lastUpdate: serverTimestamp()
-                }, { merge: true });
+                };
+                if (session === 'morning') payload.attendanceMorning = { ...window.attendanceMorningState };
+                if (session === 'night') payload.attendanceNight = { ...window.attendanceNightState };
+                // Field lama dipertahankan sebagai kompatibilitas, tetapi data resmi memakai field per sesi.
+                payload.attendance = { ...activeState };
 
-                showToast("Data absensi berhasil dikunci dan disinkronkan ke Pimpinan!", "success");
-                renderAbsensiUI(); 
+                await setDoc(roomRef, payload, { merge: true });
+
+                showToast(`Data absensi ${session === 'morning' ? 'pagi' : 'malam'} berhasil dikunci dan disinkronkan ke Pimpinan!`, "success");
+                renderAbsensiUI();
 
                 const historyDateInput = document.getElementById('musyrifHistoryDate');
                 if (historyDateInput) {
@@ -1897,39 +2522,48 @@
             if(!dateVal || !localDevUid || !currentRoomId) return;
             const container = document.getElementById('musyrifHistoryContainer');
             container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-4 font-bold"><i class="fas fa-circle-notch fa-spin mr-2"></i> Memuat data...</p>';
-            
+
+            const statusStyle = (status) => {
+                if(status === 'H') return { cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', text: '<i class="fas fa-check-circle mr-1"></i> Hadir' };
+                if(status === 'S') return { cls: 'bg-amber-100 text-amber-800 border-amber-200', text: '<i class="fas fa-procedures mr-1"></i> Sakit' };
+                if(status === 'I') return { cls: 'bg-blue-100 text-blue-800 border-blue-200', text: '<i class="fas fa-info-circle mr-1"></i> Izin' };
+                if(status === 'A') return { cls: 'bg-rose-100 text-rose-800 border-rose-200', text: '<i class="fas fa-times-circle mr-1"></i> Alpa' };
+                return { cls: 'bg-slate-100 text-slate-600 border-slate-200', text: 'Tidak tercatat' };
+            };
+
+            const renderSession = (label, time, icon, attendance, saved, tone) => {
+                const toneCls = tone === 'morning'
+                    ? 'bg-amber-50 border-amber-100 text-amber-900'
+                    : 'bg-indigo-50 border-indigo-100 text-indigo-900';
+                const iconCls = tone === 'morning' ? 'text-amber-500' : 'text-indigo-500';
+                let body = '';
+                if (!saved) {
+                    body = `<div class="text-[11px] font-bold text-slate-500 bg-white/70 border border-slate-200 rounded-xl px-3 py-3 text-center"><i class="fas fa-exclamation-circle mr-1.5"></i> Absensi ${label.toLowerCase()} belum diisi / tidak tercatat.</div>`;
+                } else {
+                    const names = [...new Set([...(window.daftarSantri || []), ...Object.keys(attendance || {})])].sort();
+                    if (!names.length) {
+                        body = '<div class="text-[11px] font-bold text-slate-500 text-center py-3">Tidak ada santri pada sesi ini.</div>';
+                    } else {
+                        body = '<div class="space-y-2">' + names.map(sName => {
+                            const status = attendance[sName];
+                            const st = statusStyle(status);
+                            return `<div class="px-3 py-2.5 rounded-xl text-[12px] font-bold ${st.cls} flex justify-between items-center shadow-sm border"><span class="truncate mr-2"><i class="fas fa-user-circle opacity-50 mr-1.5"></i> ${sName}</span><span class="text-[10px] uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg">${st.text}</span></div>`;
+                        }).join('') + '</div>';
+                    }
+                }
+                return `<section class="rounded-2xl border p-4 ${toneCls}"><div class="flex items-center justify-between mb-3"><div><div class="text-[12px] font-black uppercase tracking-wide"><i class="fas ${icon} ${iconCls} mr-1.5"></i> Absensi ${label}</div><div class="text-[10px] font-bold opacity-70 mt-0.5">${time}</div></div><span class="text-[9px] font-black px-2 py-1 rounded-lg ${saved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${saved ? 'TERSIMPAN' : 'BELUM DIISI'}</span></div>${body}</section>`;
+            };
+
             try {
                 const colName = 'room_states_' + dateVal;
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', colName, currentRoomId);
                 const docSnap = await getDoc(roomRef);
-                
+
                 if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data.attendance && Object.keys(data.attendance).length > 0) {
-                        const sortedNames = Object.keys(data.attendance).sort();
-                        let html = '<div class="space-y-2 mt-2">';
-                        sortedNames.forEach(sName => {
-                            const status = data.attendance[sName];
-                            let bgCls = 'bg-slate-100 text-slate-600';
-                            let statusText = 'Hadir';
-                            if(status === 'H') { bgCls = 'bg-emerald-100 text-emerald-800 border-emerald-200'; statusText = '<i class="fas fa-check-circle mr-1"></i> Hadir'; }
-                            if(status === 'S') { bgCls = 'bg-amber-100 text-amber-800 border-amber-200'; statusText = '<i class="fas fa-procedures mr-1"></i> Sakit'; }
-                            if(status === 'I') { bgCls = 'bg-blue-100 text-blue-800 border-blue-200'; statusText = '<i class="fas fa-info-circle mr-1"></i> Izin'; }
-                            if(status === 'A') { bgCls = 'bg-rose-100 text-rose-800 border-rose-200'; statusText = '<i class="fas fa-times-circle mr-1"></i> Alpa'; }
-                            
-                            html += `
-                            <div class="px-3 py-2.5 rounded-xl text-[12px] font-bold ${bgCls} flex justify-between items-center shadow-sm border">
-                                <span class="truncate mr-2"><i class="fas fa-user-circle opacity-50 mr-1.5"></i> ${sName}</span> 
-                                <span class="text-[10px] uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg">${statusText}</span>
-                            </div>`;
-                        });
-                        html += '</div>';
-                        container.innerHTML = html;
-                    } else {
-                        container.innerHTML = '<p class="text-[11px] text-amber-600 text-center py-4 font-bold bg-amber-50 rounded-xl border border-amber-100"><i class="fas fa-exclamation-triangle mr-1"></i> Belum ada rekaman absensi kamar pada tanggal ini.</p>';
-                    }
+                    const normalized = window.normalizeRoomAttendanceData(docSnap.data());
+                    container.innerHTML = `<div class="space-y-4 mt-2">${renderSession('Pagi', '07.10–07.20', 'fa-sun', normalized.morning, normalized.savedMorning, 'morning')}${renderSession('Malam', '21.30–22.00', 'fa-moon', normalized.night, normalized.savedNight, 'night')}</div>`;
                 } else {
-                    container.innerHTML = '<p class="text-[11px] text-slate-500 text-center py-4 font-bold bg-slate-50 rounded-xl border border-slate-100">Belum ada rekam jejak di tanggal ini.</p>';
+                    container.innerHTML = '<div class="space-y-3"><div class="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-center text-[11px] font-bold text-amber-700"><i class="fas fa-sun mr-1.5"></i> Absensi Pagi — belum diisi / tidak tercatat.</div><div class="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-center text-[11px] font-bold text-indigo-700"><i class="fas fa-moon mr-1.5"></i> Absensi Malam — belum diisi / tidak tercatat.</div></div>';
                 }
             } catch (error) {
                 console.error("History Error:", error);
@@ -1940,6 +2574,12 @@
         function renderAbsensiUI() {
             const container = document.getElementById('absensiListContainer');
             const inputContainer = document.getElementById('absensiInputContainer');
+            const banner = document.getElementById('absensiSessionBanner');
+            const bannerIcon = document.getElementById('absensiSessionIcon');
+            const bannerTitle = document.getElementById('absensiSessionTitle');
+            const bannerTime = document.getElementById('absensiSessionTime');
+            const bannerBadge = document.getElementById('absensiSessionBadge');
+            const bannerHelp = document.getElementById('absensiSessionHelp');
             if(!container) return;
 
             if(!currentRoomId) {
@@ -1950,21 +2590,35 @@
 
             const now = new Date();
             const mins = now.getHours() * 60 + now.getMinutes();
-            let isLocked = false;
-            let isOutsideWindow = false;
-            let sesiText = '';
+            const activeSession = window.getAbsensiSession(now, false);
+            const displaySession = activeSession || window.getAbsensiSession(now, true);
+            const isMorning = displaySession === 'morning';
+            const state = window.getAttendanceStateForSession(displaySession);
+            const sessionSaved = isMorning ? window.attendanceSavedMorning : window.attendanceSavedNight;
+            const isOutsideWindow = !activeSession;
+            const isLocked = isOutsideWindow || sessionSaved;
+            const sesiText = isMorning ? 'Pagi' : 'Malam';
+            const sesiTime = isMorning ? '07.10–07.20' : '21.30–22.00';
 
-            if (mins >= 430 && mins <= 440) {
-                isLocked = window.attendanceSavedMorning;
-                sesiText = 'Pagi';
-            } else if (mins >= 1290 && mins <= 1320) {
-                isLocked = window.attendanceSavedNight;
-                sesiText = 'Malam';
-            } else {
-                isLocked = true;
-                isOutsideWindow = true;
+            if (banner) {
+                banner.className = `mb-4 rounded-2xl border p-4 transition-all duration-300 ${isMorning ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-indigo-50 border-indigo-200 text-indigo-950'}`;
+                if (bannerIcon) {
+                    bannerIcon.className = `w-10 h-10 rounded-xl flex items-center justify-center mr-3 shrink-0 ${isMorning ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`;
+                    bannerIcon.innerHTML = `<i class="fas ${isMorning ? 'fa-sun' : 'fa-moon'}"></i>`;
+                }
+                if (bannerTitle) bannerTitle.textContent = `Absensi ${sesiText}`;
+                if (bannerTime) bannerTime.textContent = sesiTime;
+                let badgeText = 'BELUM DIMULAI';
+                let badgeCls = 'bg-white/70 text-slate-600 border border-white';
+                if (sessionSaved) { badgeText = 'TERSIMPAN'; badgeCls = 'bg-emerald-100 text-emerald-700 border border-emerald-200'; }
+                else if (activeSession) { badgeText = 'SEKARANG'; badgeCls = 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse'; }
+                else if ((isMorning && mins > 440) || (!isMorning && mins > 1320)) { badgeText = 'TERLEWAT'; badgeCls = 'bg-rose-100 text-rose-700 border border-rose-200'; }
+                if (bannerBadge) { bannerBadge.textContent = badgeText; bannerBadge.className = `text-[9px] font-black px-2.5 py-1.5 rounded-lg whitespace-nowrap ${badgeCls}`; }
+                if (bannerHelp) bannerHelp.textContent = isMorning
+                    ? 'Sesi pagi disimpan terpisah dari absensi malam. Perubahan hanya dapat dilakukan pukul 07.10–07.20.'
+                    : 'Sesi malam disimpan terpisah dari absensi pagi. Perubahan hanya dapat dilakukan pukul 21.30–22.00.';
             }
-            
+
             if (inputContainer) {
                 if (isLocked) inputContainer.classList.add('hidden');
                 else inputContainer.classList.remove('hidden');
@@ -1972,70 +2626,31 @@
 
             let html = '';
             const sortedSantri = [...window.daftarSantri].sort();
-            
+
             sortedSantri.forEach(name => {
-                const status = window.attendanceState[name] || 'H'; 
-                
+                const status = state[name] || 'H';
+
                 const getBtn = (val, label, colorCls) => {
                     const isActive = status === val;
                     let baseCls = isActive ? colorCls : 'bg-slate-50 text-slate-400 border-transparent';
                     if (!isLocked && !isActive) baseCls += ' hover:bg-slate-200 cursor-pointer';
                     if (isLocked && !isActive) baseCls += ' opacity-50 cursor-not-allowed';
-                    
                     const disableAttr = isLocked ? 'disabled' : '';
                     return `<button ${disableAttr} onclick="setAbsensi('${name}', '${val}')" class="flex-1 py-2 rounded-xl text-[12px] font-black transition-all border ${baseCls}">${label}</button>`;
                 };
 
-                const actionBtns = isLocked ? '' : `
-                    <div class="flex">
-                        <button onclick="editSantri('${name}')" class="text-blue-300 hover:text-blue-600 px-2 transition" title="Edit Nama"><i class="fas fa-pencil-alt"></i></button>
-                        <button onclick="removeSantri('${name}')" class="text-rose-300 hover:text-rose-600 px-2 transition" title="Hapus Santri"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                `;
+                const actionBtns = isLocked ? '' : `<div class="flex"><button onclick="editSantri('${name}')" class="text-blue-300 hover:text-blue-600 px-2 transition" title="Edit Nama"><i class="fas fa-pencil-alt"></i></button><button onclick="removeSantri('${name}')" class="text-rose-300 hover:text-rose-600 px-2 transition" title="Hapus Santri"><i class="fas fa-trash-alt"></i></button></div>`;
 
-                html += `
-                <div class="flex flex-col p-4 border border-slate-200 rounded-2xl bg-white shadow-sm">
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="font-bold text-blue-950 text-[14px] truncate"><i class="fas fa-user-circle mr-1.5 text-slate-300 text-lg"></i> ${name}</span>
-                        ${actionBtns}
-                    </div>
-                    <div class="flex space-x-2">
-                        ${getBtn('H', 'Hadir', 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-inner')}
-                        ${getBtn('S', 'Sakit', 'bg-amber-100 text-amber-800 border-amber-300 shadow-inner')}
-                        ${getBtn('I', 'Izin', 'bg-blue-100 text-blue-800 border-blue-300 shadow-inner')}
-                        ${getBtn('A', 'Alpa', 'bg-rose-100 text-rose-800 border-rose-300 shadow-inner')}
-                    </div>
-                </div>`;
+                html += `<div class="flex flex-col p-4 border ${isMorning ? 'border-amber-100' : 'border-indigo-100'} rounded-2xl bg-white shadow-sm"><div class="flex justify-between items-center mb-3"><span class="font-bold text-blue-950 text-[14px] truncate"><i class="fas fa-user-circle mr-1.5 text-slate-300 text-lg"></i> ${name}</span>${actionBtns}</div><div class="flex space-x-2">${getBtn('H', 'Hadir', 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-inner')}${getBtn('S', 'Sakit', 'bg-amber-100 text-amber-800 border-amber-300 shadow-inner')}${getBtn('I', 'Izin', 'bg-blue-100 text-blue-800 border-blue-300 shadow-inner')}${getBtn('A', 'Alpa', 'bg-rose-100 text-rose-800 border-rose-300 shadow-inner')}</div></div>`;
             });
 
             if(sortedSantri.length > 0) {
                 if (isOutsideWindow) {
-                    html += `
-                    <div class="pt-4 mt-2 border-t border-slate-200/60">
-                        <button disabled class="w-full bg-slate-100 text-slate-500 font-bold py-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center cursor-not-allowed">
-                            <i class="fas fa-clock mr-2 text-lg"></i> DI LUAR WAKTU ABSENSI
-                        </button>
-                        <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Tombol Simpan hanya aktif pukul 07:10-07:20 dan 21:30-22:00</p>
-                    </div>
-                    `;
+                    html += `<div class="pt-4 mt-2 border-t border-slate-200/60"><button disabled class="w-full bg-slate-100 text-slate-500 font-bold py-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center cursor-not-allowed"><i class="fas fa-clock mr-2 text-lg"></i> DI LUAR WAKTU ABSENSI</button><p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Tombol Simpan hanya aktif pukul 07:10-07:20 dan 21:30-22:00</p></div>`;
                 } else if (isLocked) {
-                    html += `
-                    <div class="pt-4 mt-2 border-t border-slate-200/60">
-                        <button disabled class="w-full bg-emerald-100 text-emerald-700 font-bold py-3.5 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-center cursor-not-allowed">
-                            <i class="fas fa-check-circle mr-2 text-lg"></i> DATA ABSENSI ${sesiText.toUpperCase()} TERSIMPAN
-                        </button>
-                        <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Absensi ${sesiText} ini telah dikunci dan masuk ke Rekap Pimpinan</p>
-                    </div>
-                    `;
+                    html += `<div class="pt-4 mt-2 border-t border-slate-200/60"><button disabled class="w-full bg-emerald-100 text-emerald-700 font-bold py-3.5 rounded-xl border border-emerald-200 shadow-sm flex items-center justify-center cursor-not-allowed"><i class="fas fa-check-circle mr-2 text-lg"></i> DATA ABSENSI ${sesiText.toUpperCase()} TERSIMPAN</button><p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Absensi ${sesiText} ini telah dikunci dan masuk ke Rekap Pimpinan</p></div>`;
                 } else {
-                    html += `
-                    <div class="pt-4 mt-2 border-t border-slate-200/60">
-                        <button id="btnSimpanAbsen" onclick="simpanAbsensiKeDB()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center">
-                            <i class="fas fa-save mr-2 text-lg"></i> SIMPAN DATA ABSENSI ${sesiText.toUpperCase()}
-                        </button>
-                        <p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Tekan tombol ini agar data masuk ke Pimpinan</p>
-                    </div>
-                    `;
+                    html += `<div class="pt-4 mt-2 border-t border-slate-200/60"><button id="btnSimpanAbsen" onclick="simpanAbsensiKeDB()" class="w-full ${isMorning ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold py-3.5 rounded-xl transition shadow-md flex items-center justify-center"><i class="fas fa-save mr-2 text-lg"></i> SIMPAN DATA ABSENSI ${sesiText.toUpperCase()}</button><p class="text-[9px] text-center text-slate-400 mt-2 font-bold uppercase tracking-wider">Tekan tombol ini agar data sesi ${sesiText.toLowerCase()} masuk ke Pimpinan</p></div>`;
                 }
             }
 
@@ -2068,6 +2683,7 @@
                 const checkValue = window.checklistState[task.id];
                 const isChecked = !!checkValue;
                 const noteText = window.notesState[task.id];
+                const missedReason = window.missedReasons[task.id];
 
                 if (isNow) currentTask = task;
                 if (!isNoCheck) {
@@ -2134,6 +2750,55 @@
                     </div>`;
                 }
 
+
+                if (isPas && !isChecked && !isNoCheck) {
+                    const reasonKey = `reason-${task.id}`;
+                    const reasonEditorOpen = window.activeEditors.has(reasonKey);
+                    const reasonEditorHidden = reasonEditorOpen ? '' : 'hidden';
+                    const selectedReason = missedReason ? missedReason.reason : '';
+                    const reasonOptions = [
+                        'Kegiatan ditiadakan',
+                        'Ada perubahan jadwal pondok',
+                        'Mendampingi santri sakit',
+                        'Tugas dialihkan ke musyrif lain',
+                        'Lainnya'
+                    ].map(opt => `<option value="${opt}" ${selectedReason === opt ? 'selected' : ''}>${opt}</option>`).join('');
+
+                    if (missedReason) {
+                        extraContentHTML += `
+                        <div class="mt-3 p-3 rounded-2xl border border-violet-200 bg-violet-50/80">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[9px] font-black uppercase tracking-wider text-violet-700"><i class="fas fa-circle-info mr-1"></i> Alasan Tugas Tidak Terlaksana</span>
+                                <button onclick="toggleMissedReasonEditor(${task.id})" class="text-[9px] font-black text-violet-700 bg-white border border-violet-200 px-2 py-1 rounded-lg">Edit</button>
+                            </div>
+                            <div class="text-[11px] font-extrabold text-violet-900 mt-1">${window.escapeHtml(missedReason.reason)}</div>
+                            ${missedReason.detail ? `<div class="text-[10px] font-semibold text-slate-600 mt-1">${window.escapeHtml(missedReason.detail)}</div>` : ''}
+                            ${missedReason.time ? `<div class="text-[9px] font-bold text-slate-400 mt-1">Dicatat ${window.escapeHtml(missedReason.time)}</div>` : ''}
+                        </div>`;
+                    } else {
+                        extraContentHTML += `
+                        <button onclick="toggleMissedReasonEditor(${task.id})" class="mt-3 w-full text-left p-3 rounded-2xl border border-rose-200 bg-rose-100/70 hover:bg-rose-100 transition">
+                            <div class="text-[10px] font-black text-rose-700"><i class="fas fa-triangle-exclamation mr-1.5"></i> ALASAN BELUM DIISI</div>
+                            <div class="text-[10px] font-semibold text-rose-600 mt-0.5">Ketuk untuk menjelaskan mengapa tugas ini tidak terlaksana.</div>
+                        </button>`;
+                    }
+
+                    extraContentHTML += `
+                    <div id="missed-reason-editor-${task.id}" class="${reasonEditorHidden} mt-3 p-3 bg-white rounded-2xl border border-violet-200 shadow-inner">
+                        <label class="block text-[9px] font-black text-violet-800 uppercase mb-1">Alasan</label>
+                        <select id="missed-reason-select-${task.id}" class="w-full text-[11px] p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-violet-300">
+                            <option value="">-- Pilih alasan --</option>
+                            ${reasonOptions}
+                        </select>
+                        <label class="block text-[9px] font-black text-violet-800 uppercase mt-3 mb-1">Keterangan Tambahan</label>
+                        <textarea id="missed-reason-detail-${task.id}" rows="2" class="w-full text-[11px] p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-violet-300" placeholder="Opsional, kecuali jika memilih Lainnya...">${missedReason ? window.escapeHtml(missedReason.detail || '') : ''}</textarea>
+                        <div class="flex justify-end gap-2 mt-2">
+                            <button onclick="toggleMissedReasonEditor(${task.id})" class="bg-slate-200 text-slate-600 text-[10px] font-bold px-3 py-1.5 rounded-lg">Batal</button>
+                            <button onclick="saveMissedReason(${task.id})" class="bg-violet-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">Simpan Alasan</button>
+                        </div>
+                    </div>`;
+                }
+
                 const isEditorOpen = window.activeEditors.has(task.id);
                 const editorHidden = isEditorOpen ? '' : 'hidden';
 
@@ -2171,6 +2836,7 @@
                     </div>`;
             });
             container.innerHTML = html;
+            renderMusyrifExtraCards();
 
             if (currentTask) {
                 const cT = document.getElementById('currentActivityTitle');
@@ -2194,6 +2860,111 @@
             if(pB) pB.style.width = `${pct}%`;
         }
 
+        function renderAdminAttendanceSession(label, attendance, saved, tone = 'morning') {
+            const isMorning = tone === 'morning';
+            const counts = window.getAttendanceCounts(attendance || {});
+            const cardCls = isMorning ? 'bg-amber-50 border-amber-100' : 'bg-indigo-50 border-indigo-100';
+            const titleCls = isMorning ? 'text-amber-800' : 'text-indigo-800';
+            const icon = isMorning ? 'fa-sun' : 'fa-moon';
+            const time = isMorning ? '07.10–07.20' : '21.30–22.00';
+
+            if (!saved) {
+                return `<div class="rounded-2xl border ${cardCls} p-3"><div class="flex items-center justify-between gap-2"><div><div class="text-[10px] font-black uppercase ${titleCls}"><i class="fas ${icon} mr-1.5"></i> Absensi ${label}</div><div class="text-[9px] font-bold text-slate-500 mt-0.5">${time}</div></div><span class="text-[8px] font-black bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg">BELUM DIISI</span></div><div class="mt-2 text-[9px] font-bold text-slate-500 bg-white/70 rounded-lg px-2 py-2 text-center">Tidak tercatat</div></div>`;
+            }
+
+            const names = Object.keys(attendance || {}).sort();
+            const gridItems = names.map(sName => {
+                const status = attendance[sName];
+                let bgCls = 'bg-slate-100 text-slate-600';
+                if(status === 'H') bgCls = 'bg-emerald-100 text-emerald-800';
+                if(status === 'S') bgCls = 'bg-amber-100 text-amber-800';
+                if(status === 'I') bgCls = 'bg-blue-100 text-blue-800';
+                if(status === 'A') bgCls = 'bg-rose-100 text-rose-800';
+                return `<div class="px-2 py-1.5 rounded-xl text-[10px] font-bold ${bgCls} flex justify-between items-center shadow-inner border border-white/20"><span class="truncate mr-1">${sName}</span><span class="w-5 h-5 flex items-center justify-center rounded-full bg-white/60 shrink-0 shadow-sm">${status || '-'}</span></div>`;
+            }).join('');
+
+            return `<div class="rounded-2xl border ${cardCls} p-3"><div class="flex items-center justify-between gap-2 mb-2"><div><div class="text-[10px] font-black uppercase ${titleCls}"><i class="fas ${icon} mr-1.5"></i> Absensi ${label}</div><div class="text-[9px] font-bold text-slate-500 mt-0.5">${time}</div></div><span class="text-[8px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg">TERSIMPAN</span></div><div class="grid grid-cols-4 gap-1 mb-2 text-center"><span class="text-[8px] font-black bg-emerald-100 text-emerald-700 rounded-lg py-1">H ${counts.H}</span><span class="text-[8px] font-black bg-amber-100 text-amber-700 rounded-lg py-1">S ${counts.S}</span><span class="text-[8px] font-black bg-blue-100 text-blue-700 rounded-lg py-1">I ${counts.I}</span><span class="text-[8px] font-black bg-rose-100 text-rose-700 rounded-lg py-1">A ${counts.A}</span></div><div class="grid grid-cols-2 gap-2">${gridItems}</div></div>`;
+        }
+
+
+        function renderAdminDailySummary(musyrifStats, displayDateObj) {
+            const box = document.getElementById('adminDailySummary');
+            if (!box) return;
+
+            const totalTasks = musyrifStats.reduce((sum, m) => sum + m.sel + m.ter + m.bel, 0);
+            const doneTasks = musyrifStats.reduce((sum, m) => sum + m.sel, 0);
+            const skippedTasks = musyrifStats.reduce((sum, m) => sum + m.ter, 0);
+            const missingReasons = musyrifStats.reduce((sum, m) => sum + (m.missedWithoutReason || 0), 0);
+            const incidentCount = musyrifStats.reduce((sum, m) => sum + (m.incidentCount || 0), 0);
+            const handoverCount = musyrifStats.reduce((sum, m) => sum + (m.handoverCount || 0), 0);
+
+            let roomCount = 0, morningSaved = 0, nightSaved = 0;
+            const morningCounts = {H:0,S:0,I:0,A:0};
+            const nightCounts = {H:0,S:0,I:0,A:0};
+
+            Object.entries(globalRooms || {}).forEach(([roomId, roomData]) => {
+                if (!roomData || !Array.isArray(roomData.santri) || roomData.santri.length === 0) return;
+                roomCount++;
+                const normalized = window.normalizeRoomAttendanceData(adminRoomStates[roomId] || {});
+                if (normalized.savedMorning) {
+                    morningSaved++;
+                    const c = window.getAttendanceCounts(normalized.morning);
+                    Object.keys(morningCounts).forEach(k => morningCounts[k] += c[k]);
+                }
+                if (normalized.savedNight) {
+                    nightSaved++;
+                    const c = window.getAttendanceCounts(normalized.night);
+                    Object.keys(nightCounts).forEach(k => nightCounts[k] += c[k]);
+                }
+            });
+
+            const dateLabel = displayDateObj.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+            box.innerHTML = `
+                <div class="flex items-center justify-between mb-4 gap-2">
+                    <div>
+                        <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-gauge-high mr-2 text-blue-500"></i> Ringkasan Harian</h3>
+                        <div class="text-[9px] font-bold text-slate-400 mt-1">${window.escapeHtml(dateLabel)}</div>
+                    </div>
+                    <span class="text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg">${musyrifStats.length} Musyrif</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-3"><div class="text-[9px] font-black text-emerald-700 uppercase">Tugas Tuntas</div><div class="text-[20px] font-black text-emerald-800">${doneTasks}<span class="text-[10px] text-emerald-600">/${totalTasks}</span></div></div>
+                    <div class="bg-rose-50 border border-rose-100 rounded-2xl p-3"><div class="text-[9px] font-black text-rose-700 uppercase">Terlewat</div><div class="text-[20px] font-black text-rose-800">${skippedTasks}</div><div class="text-[9px] font-bold ${missingReasons ? 'text-rose-600' : 'text-slate-400'}">${missingReasons} belum diberi alasan</div></div>
+                    <div class="bg-amber-50 border border-amber-100 rounded-2xl p-3"><div class="text-[9px] font-black text-amber-700 uppercase">Absensi Pagi</div><div class="text-[16px] font-black text-amber-800">${morningSaved}/${roomCount} kamar</div><div class="text-[9px] font-bold text-slate-500">H ${morningCounts.H} • S ${morningCounts.S} • I ${morningCounts.I} • A ${morningCounts.A}</div></div>
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-3"><div class="text-[9px] font-black text-indigo-700 uppercase">Absensi Malam</div><div class="text-[16px] font-black text-indigo-800">${nightSaved}/${roomCount} kamar</div><div class="text-[9px] font-bold text-slate-500">H ${nightCounts.H} • S ${nightCounts.S} • I ${nightCounts.I} • A ${nightCounts.A}</div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <div class="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600"><i class="fas fa-clipboard-list text-amber-500 mr-1.5"></i> Catatan Kejadian: <b>${incidentCount}</b></div>
+                    <div class="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-600"><i class="fas fa-right-left text-indigo-500 mr-1.5"></i> Serah Terima: <b>${handoverCount}</b></div>
+                </div>`;
+        }
+
+        function renderAdminOperationalNotes(musyrif) {
+            const incidents = Array.isArray(musyrif.incidentNotes) ? musyrif.incidentNotes : [];
+            const handovers = Array.isArray(musyrif.handoverRecords) ? musyrif.handoverRecords : [];
+            if (!incidents.length && !handovers.length) return '';
+
+            const incidentHtml = incidents.length ? `
+                <div class="rounded-2xl border border-amber-100 bg-amber-50/60 p-3">
+                    <div class="text-[9px] font-black text-amber-700 uppercase mb-2"><i class="fas fa-clipboard-list mr-1"></i> Catatan Kejadian (${incidents.length})</div>
+                    <div class="space-y-2 max-h-36 overflow-y-auto no-scrollbar">
+                        ${incidents.slice().reverse().map(item => `<div class="bg-white/80 border border-amber-100 rounded-xl p-2"><div class="flex justify-between gap-2"><span class="text-[10px] font-black text-blue-950">${window.escapeHtml(item.student)}</span><span class="text-[8px] font-bold text-slate-400">${window.escapeHtml(item.time)}</span></div><div class="text-[9px] font-extrabold text-amber-700">${window.escapeHtml(item.category)}</div><div class="text-[9px] font-semibold text-slate-600 mt-0.5">${window.escapeHtml(item.note)}</div></div>`).join('')}
+                    </div>
+                </div>` : '';
+
+            const latest = handovers[handovers.length - 1];
+            const handoverHtml = latest ? `
+                <div class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3">
+                    <div class="text-[9px] font-black text-indigo-700 uppercase mb-2"><i class="fas fa-right-left mr-1"></i> Serah Terima Terakhir</div>
+                    <div class="flex justify-between gap-2"><span class="text-[10px] font-black text-blue-950">${window.escapeHtml(latest.condition)}</span><span class="text-[8px] font-bold text-slate-400">${window.escapeHtml(latest.time)}</span></div>
+                    <div class="text-[9px] font-bold text-slate-600 mt-1">Sakit ${latest.sick || 0} • Izin ${latest.permit || 0}</div>
+                    <div class="text-[9px] font-bold text-indigo-700 mt-1">Diteruskan kepada: ${window.escapeHtml(latest.to)}</div>
+                    ${latest.note ? `<div class="text-[9px] font-semibold text-slate-600 mt-1">${window.escapeHtml(latest.note)}</div>` : ''}
+                    <div class="text-[8px] font-bold text-slate-400 mt-1">${handovers.length} catatan serah terima hari ini</div>
+                </div>` : '';
+            return `<div class="mt-4 pt-3 border-t border-slate-200/60 grid grid-cols-1 gap-2">${incidentHtml}${handoverHtml}</div>`;
+        }
+
         function renderAdminUI(now) {
             const isToday = window.adminSelectedDate === window.getYYYYMMDD();
             const displayDateObj = isToday ? now : new Date(window.adminSelectedDate);
@@ -2208,8 +2979,10 @@
             let musyrifStats = [];
 
             Object.entries(musyrifListState).forEach(([musyrifId, musyrif]) => {
-                let sel = 0, ter = 0, bel = 0, totalValid = 0;
+                let sel = 0, ter = 0, bel = 0, totalValid = 0, missedWithoutReason = 0;
                 let totalNotes = musyrif.notes ? Object.keys(musyrif.notes).length : 0;
+                let incidentCount = Array.isArray(musyrif.incidentNotes) ? musyrif.incidentNotes.length : 0;
+                let handoverCount = Array.isArray(musyrif.handoverRecords) ? musyrif.handoverRecords.length : 0;
 
                 scheduleHariIni.forEach(t => {
                     if (t.noCheck || (t.noCheckOn && t.noCheckOn.includes(day))) return;
@@ -2222,7 +2995,14 @@
                         isPas = now >= parseTime(cp.end, now);
                     }
 
-                    if (isChecked) sel++; else if (isPas) ter++; else bel++;
+                    if (isChecked) {
+                        sel++;
+                    } else if (isPas) {
+                        ter++;
+                        if (!(musyrif.missedReasons && musyrif.missedReasons[t.id])) missedWithoutReason++;
+                    } else {
+                        bel++;
+                    }
                 });
                 
                 const pct = totalValid > 0 ? Math.round((sel / totalValid) * 100) : 0;
@@ -2239,51 +3019,45 @@
 
                 if (myRoomId) {
                     musyrif.roomName = myRoomData.name;
-                    const roomState = adminRoomStates[myRoomId];
-                    musyrif.attendance = (roomState && roomState.attendance) ? roomState.attendance : {};
+                    const roomState = adminRoomStates[myRoomId] || {};
+                    const normalizedAttendance = window.normalizeRoomAttendanceData(roomState);
+                    musyrif.attendanceMorning = normalizedAttendance.morning;
+                    musyrif.attendanceNight = normalizedAttendance.night;
+                    musyrif.savedMorning = normalizedAttendance.savedMorning;
+                    musyrif.savedNight = normalizedAttendance.savedNight;
                 } else {
                     musyrif.roomName = "Belum Ada Kamar";
-                    musyrif.attendance = {};
+                    musyrif.attendanceMorning = {};
+                    musyrif.attendanceNight = {};
+                    musyrif.savedMorning = false;
+                    musyrif.savedNight = false;
                 }
 
-                musyrifStats.push({ ...musyrif, sel, ter, bel, pct, totalNotes });
+                musyrifStats.push({ ...musyrif, sel, ter, bel, pct, totalNotes, missedWithoutReason, incidentCount, handoverCount });
             });
 
             musyrifStats.sort((a, b) => b.pct - a.pct);
+            renderAdminDailySummary(musyrifStats, displayDateObj);
 
             musyrifStats.forEach((musyrif, index) => {
                 const bCl = musyrif.ter > 3 ? 'border-l-rose-500' : 'border-l-blue-500';
                 const notesBadge = musyrif.totalNotes > 0 ? `<span class="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-2"><i class="fas fa-comment-dots mr-1"></i>${musyrif.totalNotes} Catatan</span>` : '';
+                const incidentsBadge = musyrif.incidentCount > 0 ? `<span class="bg-orange-100 text-orange-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-1"><i class="fas fa-clipboard-list mr-1"></i>${musyrif.incidentCount} Kejadian</span>` : '';
+                const handoverBadge = musyrif.handoverCount > 0 ? `<span class="bg-indigo-100 text-indigo-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-1"><i class="fas fa-right-left mr-1"></i>${musyrif.handoverCount} Serah Terima</span>` : '';
                 
                 let rankBadge = '';
                 if (index === 0 && musyrif.pct > 0) rankBadge = '<i class="fas fa-trophy text-yellow-400 text-xl ml-2 drop-shadow-sm" title="Peringkat 1"></i>';
                 else if (index === 1 && musyrif.pct > 0) rankBadge = '<i class="fas fa-medal text-slate-400 text-lg ml-2 drop-shadow-sm" title="Peringkat 2"></i>';
                 else if (index === 2 && musyrif.pct > 0) rankBadge = '<i class="fas fa-medal text-amber-700 text-lg ml-2 drop-shadow-sm" title="Peringkat 3"></i>';
 
-                let absenHtml = '';
-                if (musyrif.attendance && Object.keys(musyrif.attendance).length > 0) {
-                    const sortedNames = Object.keys(musyrif.attendance).sort();
-                    let gridItems = '';
-                    sortedNames.forEach(sName => {
-                        const status = musyrif.attendance[sName];
-                        let bgCls = 'bg-slate-100 text-slate-600';
-                        if(status === 'H') bgCls = 'bg-emerald-100 text-emerald-800';
-                        if(status === 'S') bgCls = 'bg-amber-100 text-amber-800';
-                        if(status === 'I') bgCls = 'bg-blue-100 text-blue-800';
-                        if(status === 'A') bgCls = 'bg-rose-100 text-rose-800';
-                        
-                        gridItems += `<div class="px-2 py-1.5 rounded-xl text-[10px] font-bold ${bgCls} flex justify-between items-center shadow-inner border border-white/20"><span class="truncate mr-1">${sName}</span> <span class="w-5 h-5 flex items-center justify-center rounded-full bg-white/60 shrink-0 shadow-sm">${status}</span></div>`;
-                    });
-                    absenHtml = `
-                    <div class="mt-5 pt-4 border-t border-slate-200/60 relative z-10">
-                        <p class="text-[10px] font-extrabold text-blue-900 uppercase mb-3 flex items-center"><i class="fas fa-users mr-1.5 text-blue-500"></i> Detail Absensi Santri</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            ${gridItems}
-                        </div>
-                    </div>`;
-                } else {
-                    absenHtml = `<div class="mt-5 pt-4 border-t border-slate-200/60 text-center text-[10px] text-slate-400 font-bold relative z-10">Belum ada data absensi hari ini</div>`;
-                }
+                let absenHtml = `
+                <div class="mt-5 pt-4 border-t border-slate-200/60 relative z-10">
+                    <p class="text-[10px] font-extrabold text-blue-900 uppercase mb-3 flex items-center"><i class="fas fa-users mr-1.5 text-blue-500"></i> Absensi Santri — Pagi & Malam</p>
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                        ${renderAdminAttendanceSession('Pagi', musyrif.attendanceMorning, musyrif.savedMorning, 'morning')}
+                        ${renderAdminAttendanceSession('Malam', musyrif.attendanceNight, musyrif.savedNight, 'night')}
+                    </div>
+                </div>`;
 
                 let detailHtml = '<div class="space-y-1.5 mt-3 max-h-60 overflow-y-auto no-scrollbar pr-1">';
                 scheduleHariIni.forEach(t => {
@@ -2311,6 +3085,16 @@
                         statusHtml = '<span class="text-[9px] font-black text-slate-500 bg-slate-200 px-2 py-0.5 rounded-lg"><i class="fas fa-clock"></i> WAIT</span>';
                     }
 
+                    let reasonHtml = '';
+                    const missedReason = musyrif.missedReasons && musyrif.missedReasons[t.id];
+                    if (!isChecked && isPas) {
+                        if (missedReason) {
+                            reasonHtml = `<div class="mt-2 text-[9px] font-semibold text-violet-800 bg-violet-50 p-2 rounded-lg border border-violet-200/60"><i class="fas fa-circle-info mr-1 text-violet-500"></i><b>${window.escapeHtml(missedReason.reason)}</b>${missedReason.detail ? ` — ${window.escapeHtml(missedReason.detail)}` : ''}</div>`;
+                        } else {
+                            reasonHtml = `<div class="mt-2 text-[9px] font-black text-rose-700 bg-rose-100 p-2 rounded-lg border border-rose-200/60"><i class="fas fa-triangle-exclamation mr-1"></i> ALASAN BELUM DIISI</div>`;
+                        }
+                    }
+
                     let noteHtml = '';
                     if (noteText) {
                         noteHtml = `
@@ -2329,6 +3113,7 @@
                             ${statusHtml}
                         </div>
                         ${noteHtml}
+                        ${reasonHtml}
                     </div>`;
                 });
                 detailHtml += '</div>';
@@ -2339,7 +3124,7 @@
                         <div class="flex justify-between items-start mb-4 relative z-10">
                             <div class="flex items-center">
                                 <div>
-                                    <h3 class="font-extrabold text-blue-950 text-[16px] flex items-center">${musyrif.name || 'Musyrif'} ${rankBadge} ${notesBadge}</h3>
+                                    <h3 class="font-extrabold text-blue-950 text-[16px] flex items-center flex-wrap">${musyrif.name || 'Musyrif'} ${rankBadge} ${notesBadge} ${incidentsBadge} ${handoverBadge}</h3>
                                     <p class="text-[11px] font-bold text-slate-500 mt-1 uppercase"><i class="fas fa-map-marker-alt mr-1 text-amber-500"></i> ${musyrif.roomName}</p>
                                 </div>
                             </div>
@@ -2352,6 +3137,7 @@
                         </div>
                         <div class="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden relative z-10"><div class="bg-primary-gradient h-full" style="width: ${musyrif.pct}%"></div></div>
                         ${absenHtml}
+                        ${renderAdminOperationalNotes(musyrif)}
                         <div class="mt-4 pt-3 border-t border-slate-200/60 relative z-10">
                             <button onclick="toggleDetailAdmin('${musyrif.uid}')" class="w-full flex justify-between items-center text-[10px] font-extrabold text-blue-700 bg-blue-50/50 hover:bg-blue-100 p-2.5 rounded-xl transition-all border border-blue-100">
                                 <span><i class="fas fa-list-check mr-1.5"></i> Lihat Rincian Tugas</span>
@@ -2425,9 +3211,9 @@
 
                 let csvContent = "data:text/csv;charset=utf-8,";
                 if (type === 'kinerja') {
-                    csvContent += "Tanggal,Nama Musyrif,Kamar,Kinerja (%),Tuntas (OK),Terlewat (SKIP),Jml Catatan Khusus,Jml Santri,Hadir (H),Sakit (S),Izin (I),Alpa (A)\n";
+                    csvContent += "Tanggal,Nama Musyrif,Kamar,Kinerja (%),Tuntas (OK),Terlewat (SKIP),Jml Catatan Khusus,Jml Santri,Status Absensi Pagi,Pagi Hadir (H),Pagi Sakit (S),Pagi Izin (I),Pagi Alpa (A),Status Absensi Malam,Malam Hadir (H),Malam Sakit (S),Malam Izin (I),Malam Alpa (A)\n";
                 } else {
-                    csvContent += "Tanggal,Nama Kamar,Nama Santri,Status Absensi\n";
+                    csvContent += "Tanggal,Sesi,Nama Kamar,Nama Santri,Status Absensi\n";
                 }
 
                 let hasData = false;
@@ -2473,35 +3259,55 @@
                                 }
                             }
 
-                            let hadir=0, sakit=0, izin=0, alpa=0, totalSantri=0;
-                            if (myRoomId && roomStatesMap[myRoomId] && roomStatesMap[myRoomId].attendance) {
-                                Object.values(roomStatesMap[myRoomId].attendance).forEach(status => {
-                                    totalSantri++;
-                                    if(status === 'H') hadir++;
-                                    else if(status === 'S') sakit++;
-                                    else if(status === 'I') izin++;
-                                    else if(status === 'A') alpa++;
-                                });
+                            let totalSantri = 0;
+                            let morningCounts = { H:0, S:0, I:0, A:0 };
+                            let nightCounts = { H:0, S:0, I:0, A:0 };
+                            let morningStatus = 'Tidak tercatat';
+                            let nightStatus = 'Tidak tercatat';
+                            if (myRoomId) {
+                                const roster = (roomsMap[myRoomId] && Array.isArray(roomsMap[myRoomId].santri)) ? roomsMap[myRoomId].santri : [];
+                                totalSantri = roster.length;
+                                const normalizedAttendance = window.normalizeRoomAttendanceData(roomStatesMap[myRoomId] || {});
+                                morningCounts = window.getAttendanceCounts(normalizedAttendance.morning);
+                                nightCounts = window.getAttendanceCounts(normalizedAttendance.night);
+                                morningStatus = normalizedAttendance.savedMorning ? 'Tercatat' : 'Tidak tercatat';
+                                nightStatus = normalizedAttendance.savedNight ? 'Tercatat' : 'Tidak tercatat';
+                                if (!totalSantri) totalSantri = new Set([...Object.keys(normalizedAttendance.morning), ...Object.keys(normalizedAttendance.night)]).size;
                             }
 
                             const roomName = myRoomId ? roomsMap[myRoomId].name : 'Belum Ada Kamar';
-                            csvContent += `"${dStr}","${musyrif.name}","${roomName}","${pct}%","${sel}","${ter}","${totalNotes}","${totalSantri}","${hadir}","${sakit}","${izin}","${alpa}"\n`;
+                            csvContent += `"${dStr}","${musyrif.name}","${roomName}","${pct}%","${sel}","${ter}","${totalNotes}","${totalSantri}","${morningStatus}","${morningCounts.H}","${morningCounts.S}","${morningCounts.I}","${morningCounts.A}","${nightStatus}","${nightCounts.H}","${nightCounts.S}","${nightCounts.I}","${nightCounts.A}"\n`;
                         });
                     } 
                     else if (type === 'absensi') {
-                        for(const [rId, rState] of Object.entries(roomStatesMap)) {
-                            if (rState.attendance) {
-                                const roomName = roomsMap[rId] ? roomsMap[rId].name : 'Kamar Tidak Diketahui';
-                                Object.entries(rState.attendance).forEach(([sName, status]) => {
-                                    let statusFull = status;
-                                    if(status === 'H') statusFull = 'Hadir';
-                                    if(status === 'S') statusFull = 'Sakit';
-                                    if(status === 'I') statusFull = 'Izin';
-                                    if(status === 'A') statusFull = 'Alpa';
-                                    
-                                    csvContent += `"${dStr}","${roomName}","${sName}","${statusFull}"\n`;
+                        const roomIds = new Set([...Object.keys(roomsMap), ...Object.keys(roomStatesMap)]);
+                        for(const rId of roomIds) {
+                            const rState = roomStatesMap[rId] || {};
+                            const normalizedAttendance = window.normalizeRoomAttendanceData(rState);
+                            const roomData = roomsMap[rId] || {};
+                            const roomName = roomData.name || 'Kamar Tidak Diketahui';
+                            const roster = [...new Set([...(Array.isArray(roomData.santri) ? roomData.santri : []), ...Object.keys(normalizedAttendance.morning), ...Object.keys(normalizedAttendance.night)])].sort();
+                            if (!roster.length) continue;
+                            hasData = true;
+
+                            const statusFull = (status) => {
+                                if(status === 'H') return 'Hadir';
+                                if(status === 'S') return 'Sakit';
+                                if(status === 'I') return 'Izin';
+                                if(status === 'A') return 'Alpa';
+                                return 'Tidak tercatat';
+                            };
+
+                            const sessions = [
+                                ['Pagi', normalizedAttendance.morning, normalizedAttendance.savedMorning],
+                                ['Malam', normalizedAttendance.night, normalizedAttendance.savedNight]
+                            ];
+                            sessions.forEach(([sessionLabel, sessionAttendance, saved]) => {
+                                roster.forEach(sName => {
+                                    const status = saved ? statusFull(sessionAttendance[sName]) : 'Tidak tercatat';
+                                    csvContent += `"${dStr}","${sessionLabel}","${roomName}","${sName}","${status}"\n`;
                                 });
-                            }
+                            });
                         }
                     }
                 }
@@ -2552,13 +3358,22 @@
             if (localStorage.getItem('isyrafDate') !== today) {
                 window.checklistState = {};
                 window.notesState = {};
-                window.attendanceState = {};
+                window.missedReasons = {};
+                window.incidentNotes = [];
+                window.handoverRecords = [];
+                window.attendanceMorningState = {};
+                window.attendanceNightState = {};
                 window.attendanceSavedMorning = false;
                 window.attendanceSavedNight = false;
                 window.notifiedTasks = new Set();
                 localStorage.setItem('isyrafState', '{}');
                 localStorage.setItem('isyrafNotes', '{}');
+                localStorage.setItem('isyrafMissedReasons', '{}');
+                localStorage.setItem('isyrafIncidentNotes', '[]');
+                localStorage.setItem('isyrafHandoverRecords', '[]');
                 localStorage.setItem('isyrafAttendance', '{}');
+                localStorage.setItem('isyrafAttendanceMorning', '{}');
+                localStorage.setItem('isyrafAttendanceNight', '{}');
                 localStorage.setItem('isyrafAttendanceSavedMorning', 'false');
                 localStorage.setItem('isyrafAttendanceSavedNight', 'false');
                 localStorage.setItem('isyrafNotified', '[]');
