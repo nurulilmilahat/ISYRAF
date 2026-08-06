@@ -63,6 +63,47 @@
             .ped-toolbar { top: 168px; }
         }
 
+
+        /* === RESPONSIVE LAYOUT MUSYRIF & PIMPINAN ===
+           Desktop memanfaatkan lebar layar, mobile tetap pas di perangkat. */
+        #screen-musyrif > header > div,
+        #screen-admin > header > div,
+        #screen-musyrif > main,
+        #screen-admin > main {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        @media (min-width: 768px) {
+            #screen-musyrif > header > div,
+            #screen-admin > header > div,
+            #screen-musyrif > main,
+            #screen-admin > main {
+                width: calc(100% - 48px);
+                max-width: 1440px;
+            }
+        }
+
+        @media (min-width: 1536px) {
+            #screen-musyrif > header > div,
+            #screen-admin > header > div,
+            #screen-musyrif > main,
+            #screen-admin > main {
+                width: calc(100% - 80px);
+                max-width: 1680px;
+            }
+        }
+
+        /* Nama santri pada area absensi selalu ditampilkan utuh. */
+        .attendance-full-name {
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            overflow-wrap: anywhere;
+            word-break: normal;
+            line-height: 1.25;
+        }
+
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-24">
@@ -2547,7 +2588,7 @@
                         body = '<div class="space-y-2">' + names.map(sName => {
                             const status = attendance[sName];
                             const st = statusStyle(status);
-                            return `<div class="px-3 py-2.5 rounded-xl text-[12px] font-bold ${st.cls} flex justify-between items-center shadow-sm border"><span class="truncate mr-2"><i class="fas fa-user-circle opacity-50 mr-1.5"></i> ${sName}</span><span class="text-[10px] uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg">${st.text}</span></div>`;
+                            return `<div class="px-3 py-2.5 rounded-xl text-[12px] font-bold ${st.cls} flex justify-between items-center gap-2 shadow-sm border"><span class="attendance-full-name flex-1 min-w-0"><i class="fas fa-user-circle opacity-50 mr-1.5"></i> ${sName}</span><span class="text-[10px] uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg shrink-0">${st.text}</span></div>`;
                         }).join('') + '</div>';
                     }
                 }
@@ -2641,7 +2682,7 @@
 
                 const actionBtns = isLocked ? '' : `<div class="flex"><button onclick="editSantri('${name}')" class="text-blue-300 hover:text-blue-600 px-2 transition" title="Edit Nama"><i class="fas fa-pencil-alt"></i></button><button onclick="removeSantri('${name}')" class="text-rose-300 hover:text-rose-600 px-2 transition" title="Hapus Santri"><i class="fas fa-trash-alt"></i></button></div>`;
 
-                html += `<div class="flex flex-col p-4 border ${isMorning ? 'border-amber-100' : 'border-indigo-100'} rounded-2xl bg-white shadow-sm"><div class="flex justify-between items-center mb-3"><span class="font-bold text-blue-950 text-[14px] truncate"><i class="fas fa-user-circle mr-1.5 text-slate-300 text-lg"></i> ${name}</span>${actionBtns}</div><div class="flex space-x-2">${getBtn('H', 'Hadir', 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-inner')}${getBtn('S', 'Sakit', 'bg-amber-100 text-amber-800 border-amber-300 shadow-inner')}${getBtn('I', 'Izin', 'bg-blue-100 text-blue-800 border-blue-300 shadow-inner')}${getBtn('A', 'Alpa', 'bg-rose-100 text-rose-800 border-rose-300 shadow-inner')}</div></div>`;
+                html += `<div class="flex flex-col p-4 border ${isMorning ? 'border-amber-100' : 'border-indigo-100'} rounded-2xl bg-white shadow-sm"><div class="flex justify-between items-center mb-3"><span class="attendance-full-name flex-1 min-w-0 font-bold text-blue-950 text-[14px] pr-2"><i class="fas fa-user-circle mr-1.5 text-slate-300 text-lg"></i> ${name}</span>${actionBtns}</div><div class="flex space-x-2">${getBtn('H', 'Hadir', 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-inner')}${getBtn('S', 'Sakit', 'bg-amber-100 text-amber-800 border-amber-300 shadow-inner')}${getBtn('I', 'Izin', 'bg-blue-100 text-blue-800 border-blue-300 shadow-inner')}${getBtn('A', 'Alpa', 'bg-rose-100 text-rose-800 border-rose-300 shadow-inner')}</div></div>`;
             });
 
             if(sortedSantri.length > 0) {
@@ -2880,10 +2921,10 @@
                 if(status === 'S') bgCls = 'bg-amber-100 text-amber-800';
                 if(status === 'I') bgCls = 'bg-blue-100 text-blue-800';
                 if(status === 'A') bgCls = 'bg-rose-100 text-rose-800';
-                return `<div class="px-2 py-1.5 rounded-xl text-[10px] font-bold ${bgCls} flex justify-between items-center shadow-inner border border-white/20"><span class="truncate mr-1">${sName}</span><span class="w-5 h-5 flex items-center justify-center rounded-full bg-white/60 shrink-0 shadow-sm">${status || '-'}</span></div>`;
+                return `<div class="px-2 py-2 rounded-xl text-[10px] font-bold ${bgCls} flex justify-between items-center gap-2 shadow-inner border border-white/20"><span class="attendance-full-name flex-1 min-w-0">${sName}</span><span class="w-5 h-5 flex items-center justify-center rounded-full bg-white/60 shrink-0 shadow-sm">${status || '-'}</span></div>`;
             }).join('');
 
-            return `<div class="rounded-2xl border ${cardCls} p-3"><div class="flex items-center justify-between gap-2 mb-2"><div><div class="text-[10px] font-black uppercase ${titleCls}"><i class="fas ${icon} mr-1.5"></i> Absensi ${label}</div><div class="text-[9px] font-bold text-slate-500 mt-0.5">${time}</div></div><span class="text-[8px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg">TERSIMPAN</span></div><div class="grid grid-cols-4 gap-1 mb-2 text-center"><span class="text-[8px] font-black bg-emerald-100 text-emerald-700 rounded-lg py-1">H ${counts.H}</span><span class="text-[8px] font-black bg-amber-100 text-amber-700 rounded-lg py-1">S ${counts.S}</span><span class="text-[8px] font-black bg-blue-100 text-blue-700 rounded-lg py-1">I ${counts.I}</span><span class="text-[8px] font-black bg-rose-100 text-rose-700 rounded-lg py-1">A ${counts.A}</span></div><div class="grid grid-cols-2 gap-2">${gridItems}</div></div>`;
+            return `<div class="rounded-2xl border ${cardCls} p-3"><div class="flex items-center justify-between gap-2 mb-2"><div><div class="text-[10px] font-black uppercase ${titleCls}"><i class="fas ${icon} mr-1.5"></i> Absensi ${label}</div><div class="text-[9px] font-bold text-slate-500 mt-0.5">${time}</div></div><span class="text-[8px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg">TERSIMPAN</span></div><div class="grid grid-cols-4 gap-1 mb-2 text-center"><span class="text-[8px] font-black bg-emerald-100 text-emerald-700 rounded-lg py-1">H ${counts.H}</span><span class="text-[8px] font-black bg-amber-100 text-amber-700 rounded-lg py-1">S ${counts.S}</span><span class="text-[8px] font-black bg-blue-100 text-blue-700 rounded-lg py-1">I ${counts.I}</span><span class="text-[8px] font-black bg-rose-100 text-rose-700 rounded-lg py-1">A ${counts.A}</span></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${gridItems}</div></div>`;
         }
 
 
