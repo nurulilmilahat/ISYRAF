@@ -104,6 +104,10 @@
             line-height: 1.25;
         }
 
+        /* === JADWAL LIBUR MUSYRIF === */
+        .work-schedule-status { transition: all .25s ease; }
+        .work-schedule-person-row:last-child { border-bottom: 0; }
+
         /* === AUDIT LOG & STATUS ONLINE === */
         .audit-dot-online { box-shadow: 0 0 0 5px rgba(16,185,129,.10); }
         .audit-activity-row:last-child { border-bottom: 0; }
@@ -131,7 +135,7 @@
                     <option value="login">Login</option><option value="logout">Logout</option><option value="checklist">Ceklis</option>
                     <option value="attendance">Absensi</option><option value="incident">Catatan Kejadian</option><option value="handover">Serah Terima</option>
                     <option value="missed_reason">Alasan Terlewat</option><option value="note">Catatan Tugas</option><option value="student">Data Santri</option>
-                    <option value="room">Kamar</option><option value="sop">SOP</option><option value="account">Akun</option>
+                    <option value="room">Kamar</option><option value="sop">SOP</option><option value="account">Akun</option><option value="payroll">Payroll</option><option value="schedule">Jadwal Libur</option>
                 </select>
                 <input type="search" id="auditFilterSearch" oninput="renderAuditHistoryList()" placeholder="Cari aktivitas..." class="text-[11px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-300">
             </div>
@@ -463,6 +467,34 @@
                     </div>
                 </div>
 
+                <!-- STATUS JADWAL PIKET / LIBUR MUSYRIF -->
+                <div id="musyrifWorkScheduleCard" class="glass-card rounded-[2rem] p-5 mb-6 border border-cyan-100 shadow-sm work-schedule-status">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-calendar-check mr-2 text-cyan-600"></i> Jadwal Piket & Libur</h3>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Dihitung otomatis dari pola jadwal Pimpinan</p>
+                        </div>
+                        <span id="musyrifWorkWeekBadge" class="text-[9px] font-black text-cyan-700 bg-cyan-50 border border-cyan-100 px-2.5 py-1.5 rounded-lg whitespace-nowrap">PEKAN --</span>
+                    </div>
+                    <div id="musyrifWorkScheduleStatus" class="mt-4 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-3">Memuat jadwal...</div>
+                </div>
+
+
+                <!-- REKAP POTONGAN GAJI MUSYRIF -->
+                <div id="musyrifPayrollCard" class="glass-card rounded-[2rem] p-5 mb-6 border border-rose-100 shadow-sm">
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-wallet mr-2 text-rose-500"></i> Rekap Potongan Periode Berjalan</h3>
+                            <p id="musyrifPayrollPeriod" class="text-[10px] font-bold text-slate-400 mt-1">Periode berganti setiap tanggal 26</p>
+                        </div>
+                        <button onclick="loadMyPayrollDashboard(true)" class="text-[9px] font-extrabold text-rose-700 bg-rose-50 border border-rose-100 px-3 py-2 rounded-xl hover:bg-rose-100 transition shrink-0"><i class="fas fa-rotate mr-1"></i> Hitung Ulang</button>
+                    </div>
+                    <div id="musyrifPayrollSummary" class="text-[10px] font-bold text-slate-400 py-3">
+                        <i class="fas fa-circle-notch fa-spin mr-1.5"></i> Menyiapkan rekap potongan...
+                    </div>
+                    <div class="mt-3 text-[9px] font-bold text-slate-400 leading-relaxed"><i class="fas fa-circle-info mr-1"></i> Tidak ceklis dikenai Rp1.000. Jika tugas juga tidak dikerjakan, ditambah potongan sesuai durasi tugas × gaji per jam. Alasan yang diajukan menunggu validasi Pimpinan.</div>
+                </div>
+
                 <!-- PENGINGAT JADWAL ABSENSI -->
                 <div id="absensiReminderCard" class="glass-card rounded-[2rem] p-5 mb-6 border border-blue-100 shadow-sm transition-all duration-300">
                     <div class="flex items-center justify-between mb-4">
@@ -668,6 +700,29 @@
         </header>
 
         <main class="max-w-md mx-auto p-5 animate-fade-in pb-10">
+            <!-- NAVIGASI TAB PIMPINAN -->
+            <div class="glass-card rounded-[2rem] p-2 mb-6 shadow-sm border border-slate-100">
+                <div class="flex gap-2 overflow-x-auto no-scrollbar" role="tablist" aria-label="Menu Pimpinan">
+                    <button type="button" id="admin-tab-btn-ringkasan" onclick="switchAdminTab('ringkasan')" class="admin-tab-btn shrink-0 flex-1 min-w-[125px] px-4 py-3 rounded-[1.5rem] bg-blue-600 text-white shadow-md text-[11px] font-extrabold transition-all">
+                        <i class="fas fa-gauge-high mr-1.5"></i> Ringkasan
+                    </button>
+                    <button type="button" id="admin-tab-btn-kinerja" onclick="switchAdminTab('kinerja')" class="admin-tab-btn shrink-0 flex-1 min-w-[125px] px-4 py-3 rounded-[1.5rem] text-slate-500 hover:text-blue-700 hover:bg-blue-50 text-[11px] font-extrabold transition-all">
+                        <i class="fas fa-chart-line mr-1.5"></i> Kinerja
+                    </button>
+                    <button type="button" id="admin-tab-btn-payroll" onclick="switchAdminTab('payroll')" class="admin-tab-btn shrink-0 flex-1 min-w-[130px] px-4 py-3 rounded-[1.5rem] text-slate-500 hover:text-blue-700 hover:bg-blue-50 text-[11px] font-extrabold transition-all">
+                        <i class="fas fa-money-check-dollar mr-1.5"></i> Payroll
+                    </button>
+                    <button type="button" id="admin-tab-btn-jadwal" onclick="switchAdminTab('jadwal')" class="admin-tab-btn shrink-0 flex-1 min-w-[135px] px-4 py-3 rounded-[1.5rem] text-slate-500 hover:text-blue-700 hover:bg-blue-50 text-[11px] font-extrabold transition-all">
+                        <i class="fas fa-calendar-days mr-1.5"></i> Jadwal & SOP
+                    </button>
+                    <button type="button" id="admin-tab-btn-data" onclick="switchAdminTab('data')" class="admin-tab-btn shrink-0 flex-1 min-w-[135px] px-4 py-3 rounded-[1.5rem] text-slate-500 hover:text-blue-700 hover:bg-blue-50 text-[11px] font-extrabold transition-all">
+                        <i class="fas fa-users-gear mr-1.5"></i> Data & Akun
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB: RINGKASAN -->
+            <section id="admin-tab-ringkasan" class="admin-tab-view animate-fade-in">
             <!-- RINGKASAN HARIAN PIMPINAN -->
             <div id="adminDailySummary" class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-blue-100">
                 <div class="flex items-center justify-between mb-3">
@@ -699,30 +754,186 @@
                 <div class="mt-3 text-[9px] font-bold text-slate-400"><i class="fas fa-database mr-1"></i> Riwayat lama tidak ditimpa. Dashboard hanya memuat 50 aktivitas terbaru agar tetap ringan.</div>
             </div>
 
-            <!-- MANAJEMEN KAMAR (DISTRIBUSI SANTRI) -->
+            <div class="mb-8">
+                <h3 class="text-[12px] font-extrabold text-blue-950 uppercase tracking-[0.1em] mb-3 px-2 flex items-center">
+                    <i class="fas fa-mosque mr-2 text-blue-500"></i> Waktu Salat Hari Ini
+                </h3>
+                <div class="flex space-x-3 overflow-x-auto pb-2 px-1 no-scrollbar" id="prayerTimesContainerAdmin"></div>
+            </div>
+            </section>
+
+            <!-- TAB: KINERJA -->
+            <section id="admin-tab-kinerja" class="admin-tab-view hidden animate-fade-in">
+            <!-- DASBOR GRAFIK TREN KINERJA -->
             <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
-                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Manajemen Kamar & Distribusi Santri</h3>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Pilih / Buat Kamar Baru</label>
-                        <select id="adminRoomSelect" onchange="loadRoomData(this.value)" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-400 mb-2">
-                            <option value="">-- Buat Kamar Baru --</option>
-                        </select>
-                        <input type="text" id="adminRoomName" placeholder="Contoh: Kamar Abu Bakar" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Tugaskan Musyrif (Bisa lebih dari 1)</label>
-                        <div id="adminRoomMusyrifs" class="max-h-32 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-2 space-y-1">
-                            <div class="text-[11px] text-slate-500">Memuat musyrif...</div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-chart-line mr-2 text-blue-500"></i> Tren Kinerja</h3>
+                    <select id="chartTimeframe" onchange="loadChartData(this.value)" class="text-[10px] font-bold text-blue-900 bg-blue-50 border border-blue-200 rounded-xl px-2 py-1.5 outline-none cursor-pointer shadow-sm">
+                        <option value="7">7 Hari (Pekan Ini)</option>
+                        <option value="30">30 Hari (Bulan Ini)</option>
+                        <option value="180">180 Hari (1 Semester)</option>
+                    </select>
+                </div>
+                <div class="relative h-44 w-full">
+                    <canvas id="performanceChart"></canvas>
+                    <div id="chartLoading" class="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl hidden z-10">
+                        <div class="flex flex-col items-center">
+                            <i class="fas fa-circle-notch fa-spin text-blue-500 text-3xl mb-2"></i>
+                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Memuat Grafik...</span>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Daftar Santri (Pisahkan dengan Enter)</label>
-                        <textarea id="adminSantriInput" rows="4" placeholder="Ahmad Fauzi&#10;Budi Santoso&#10;Hasan Basri" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
-                    </div>
-                    <button onclick="saveRoomData()" id="btnSaveRoom" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center text-[12px]">
-                        <i class="fas fa-save mr-2"></i> Simpan Data Kamar
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6 px-2">
+                <h2 class="text-[15px] font-black text-blue-950 uppercase tracking-[0.15em]">Kinerja Musyrif</h2>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <input type="date" id="adminDateSelector" onchange="changeAdminDate(this.value)" class="text-[10px] font-bold text-blue-900 bg-white border border-blue-200 rounded-xl px-2 py-1.5 outline-none shadow-sm cursor-pointer">
+                    <button onclick="openRekapModal()" class="flex items-center text-[10px] bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl font-extrabold border border-indigo-200 shadow-sm hover:bg-indigo-200 transition" title="Unduh Rekap Rentang Waktu">
+                        <i class="fas fa-download mr-1.5"></i> Rekap
                     </button>
+                    <span id="adminLiveBadge" class="flex items-center text-[11px] text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl font-extrabold border border-emerald-200 shadow-sm">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> LIVE SYNC
+                    </span>
+                </div>
+            </div>
+            <div id="adminListContainer" class="space-y-5"></div>
+            </section>
+
+            <!-- TAB: PAYROLL & VALIDASI POTONGAN -->
+            <section id="admin-tab-payroll" class="admin-tab-view hidden animate-fade-in">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5 px-2">
+                    <div>
+                        <div class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.14em]">Periode Penggajian • Berganti Setiap Tanggal 26</div>
+                        <h2 class="text-[15px] font-black text-blue-950">Potongan Gaji & Validasi Ceklis</h2>
+                    </div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <input type="month" id="payrollPeriodMonth" onchange="loadPayrollDashboard(true)" class="text-[10px] font-bold text-blue-900 bg-white border border-blue-200 rounded-xl px-3 py-2 outline-none shadow-sm cursor-pointer">
+                        <button onclick="exportPayrollCsv()" class="flex items-center text-[10px] bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl font-extrabold border border-emerald-200 shadow-sm hover:bg-emerald-200 transition">
+                            <i class="fas fa-file-csv mr-1.5"></i> Ekspor Payroll
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-amber-100">
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-scale-balanced mr-2 text-amber-500"></i> Aturan Potongan</h3>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Setiap tugas yang tidak diceklis dikenai Rp1.000. Jika tugas juga tidak dikerjakan, ditambah potongan sesuai durasi × gaji per jam. Alasan menangguhkan potongan sampai divalidasi Pimpinan.</p>
+                        </div>
+                        <span id="payrollPeriodBadge" class="text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg whitespace-nowrap">26 → 26</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                        <div class="bg-amber-50 border border-amber-100 rounded-2xl p-4"><div class="text-[9px] font-black text-amber-700 uppercase">Tidak Ceklis</div><div class="text-[11px] font-bold text-slate-600 mt-1">Rp1.000 per tugas jika tidak ada uzur valid</div></div>
+                        <div class="bg-rose-50 border border-rose-100 rounded-2xl p-4"><div class="text-[9px] font-black text-rose-700 uppercase">Tidak Dikerjakan</div><div class="text-[11px] font-bold text-slate-600 mt-1">Tambahan: durasi tugas × gaji per jam</div></div>
+                        <div class="bg-violet-50 border border-violet-100 rounded-2xl p-4"><div class="text-[9px] font-black text-violet-700 uppercase">Ada Alasan</div><div class="text-[11px] font-bold text-slate-600 mt-1">Kedua potongan di-hold sampai divalidasi</div></div>
+                        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><div class="text-[9px] font-black text-emerald-700 uppercase">Uzur Valid</div><div class="text-[11px] font-bold text-slate-600 mt-1">Semua potongan untuk tugas tersebut menjadi Rp0</div></div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-sliders mr-2 text-blue-500"></i> Pengaturan Gaji</h3>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Gaji per jam sudah diisi sesuai data referensi. Gaji pokok bulanan dapat diisi untuk menghitung gaji bersih.</p>
+                        </div>
+                        <button onclick="savePayrollConfig()" class="text-[10px] font-extrabold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-2 rounded-xl hover:bg-blue-100 transition"><i class="fas fa-save mr-1"></i> Simpan</button>
+                    </div>
+                    <div class="mb-4 max-w-xs">
+                        <label class="block text-[9px] font-black text-slate-500 uppercase mb-1">Denda Tidak Ceklis / Tugas</label>
+                        <input type="number" min="0" step="500" id="payrollForgotPenalty" value="1000" class="w-full text-[11px] font-bold p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                    <div id="payrollConfigUsers" class="space-y-2"><div class="text-[10px] font-bold text-slate-400 py-3">Memuat akun musyrif...</div></div>
+                </div>
+
+                <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-violet-100">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-user-clock mr-2 text-violet-500"></i> Menunggu Validasi Pimpinan</h3>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Alasan tugas terlewat yang belum diputuskan menahan potongan Rp1.000 dan potongan tidak melakukan tugas sampai ada keputusan Pimpinan.</p>
+                        </div>
+                        <span id="payrollPendingCount" class="text-[9px] font-black text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1.5 rounded-lg">0 pending</span>
+                    </div>
+                    <div id="payrollPendingValidation" class="space-y-2"><div class="text-[10px] font-bold text-slate-400 py-3">Memuat data periode...</div></div>
+                </div>
+
+                <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-emerald-100">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-money-bill-transfer mr-2 text-emerald-500"></i> Rekap Payroll</h3>
+                            <p id="payrollSummarySubtitle" class="text-[10px] font-bold text-slate-400 mt-1">Periode berganti setiap tanggal 26</p>
+                        </div>
+                        <button onclick="loadPayrollDashboard(true)" class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl hover:bg-emerald-100 transition"><i class="fas fa-rotate mr-1"></i> Hitung Ulang</button>
+                    </div>
+                    <div id="payrollSummaryContainer" class="space-y-3"><div class="text-center text-[11px] font-bold text-slate-400 py-8"><i class="fas fa-circle-notch fa-spin mr-2"></i> Menyiapkan payroll...</div></div>
+                    <div class="mt-4 text-[9px] font-bold text-slate-400 leading-relaxed"><i class="fas fa-circle-info mr-1"></i> Tugas yang masih menunggu validasi belum menjadi potongan final. Periode dimulai tanggal 26 dan berganti saat masuk tanggal 26 bulan berikutnya.</div>
+                </div>
+            </section>
+
+            <!-- TAB: JADWAL & SOP -->
+            <section id="admin-tab-jadwal" class="admin-tab-view hidden animate-fade-in">
+            <!-- PENGATURAN POLA JADWAL LIBUR MUSYRIF -->
+            <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-cyan-100">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-calendar-days mr-2 text-cyan-600"></i> Pengaturan Pola Jadwal</h3>
+                        <p class="text-[10px] font-bold text-slate-400 mt-1">Pola libur bergilir otomatis Pekan 1–5 dan pengecualian jadwal hari ini.</p>
+                    </div>
+                    <span id="adminWorkWeekBadge" class="text-[9px] font-black text-cyan-700 bg-cyan-50 border border-cyan-100 px-2.5 py-1.5 rounded-lg whitespace-nowrap">PEKAN --</span>
+                </div>
+
+                <div id="adminWorkScheduleToday" class="mb-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                    <div class="text-[10px] font-black text-blue-950 uppercase tracking-wider mb-2"><i class="fas fa-calendar-check mr-1.5 text-emerald-500"></i> Jadwal Aktif Hari Ini</div>
+                    <div class="text-[10px] font-bold text-slate-400">Memuat jadwal musyrif...</div>
+                </div>
+
+                <details class="group bg-white/70 border border-slate-100 rounded-2xl p-4 mb-3">
+                    <summary class="cursor-pointer list-none flex items-center justify-between gap-3">
+                        <div><div class="text-[11px] font-black text-blue-950">Template Pekan 1–4</div><div class="text-[9px] font-semibold text-slate-400 mt-0.5">Libur Sabtu 17.00 sampai Ahad 17.00</div></div>
+                        <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i>
+                    </summary>
+                    <div class="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-3">
+                        <div class="bg-cyan-50/60 border border-cyan-100 rounded-xl p-3">
+                            <div class="text-[10px] font-black text-cyan-800 mb-1">Pekan 1 & 3 — Musyrif Libur</div>
+                            <div id="workScheduleWeek13" class="space-y-1.5"><div class="text-[10px] text-slate-400 font-bold">Memuat akun...</div></div>
+                        </div>
+                        <div class="bg-blue-50/60 border border-blue-100 rounded-xl p-3">
+                            <div class="text-[10px] font-black text-blue-800 mb-1">Pekan 2 & 4 — Musyrif Libur</div>
+                            <div id="workScheduleWeek24" class="space-y-1.5"><div class="text-[10px] text-slate-400 font-bold">Memuat akun...</div></div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="group bg-white/70 border border-slate-100 rounded-2xl p-4 mb-3">
+                    <summary class="cursor-pointer list-none flex items-center justify-between gap-3">
+                        <div><div class="text-[11px] font-black text-blue-950">Template Pekan 5 — Shift Ahad</div><div class="text-[9px] font-semibold text-slate-400 mt-0.5">Sabtu seluruh musyrif piket penuh</div></div>
+                        <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition"></i>
+                    </summary>
+                    <div class="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-3">
+                        <div class="bg-amber-50/70 border border-amber-100 rounded-xl p-3">
+                            <div class="text-[10px] font-black text-amber-800 mb-1">Libur Pagi–Siang • Ahad 03.50–12.40</div>
+                            <div id="workScheduleWeek5Morning" class="space-y-1.5"><div class="text-[10px] text-slate-400 font-bold">Memuat akun...</div></div>
+                        </div>
+                        <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3">
+                            <div class="text-[10px] font-black text-indigo-800 mb-1">Libur Sore–Malam • Ahad 15.00–22.00</div>
+                            <div id="workScheduleWeek5Evening" class="space-y-1.5"><div class="text-[10px] text-slate-400 font-bold">Memuat akun...</div></div>
+                        </div>
+                    </div>
+                </details>
+
+                <button onclick="saveWorkScheduleTemplate()" id="btnSaveWorkScheduleTemplate" class="w-full bg-cyan-600 text-white font-bold py-3 rounded-xl hover:bg-cyan-700 transition shadow-md flex items-center justify-center text-[11px]"><i class="fas fa-save mr-2"></i> Simpan Pola Jadwal</button>
+
+                <div class="mt-5 pt-4 border-t border-slate-200/70">
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div><div class="text-[11px] font-black text-blue-950"><i class="fas fa-wand-magic-sparkles mr-1.5 text-violet-500"></i> Timpa Jadwal Hari Ini</div><div class="text-[9px] font-semibold text-slate-400 mt-0.5">Berlaku hanya hari ini dan tidak mengubah template bulan berikutnya.</div></div>
+                        <span id="workScheduleOverrideBadge" class="hidden text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-1 rounded-lg">OVERRIDE AKTIF</span>
+                    </div>
+                    <div id="workScheduleOverrideRows" class="space-y-2"><div class="text-[10px] text-slate-400 font-bold">Memuat akun...</div></div>
+                    <textarea id="workScheduleOverrideNote" rows="2" placeholder="Catatan override (opsional), misalnya tukar jadwal karena sakit..." class="w-full mt-3 text-[11px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300"></textarea>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                        <button onclick="saveWorkScheduleOverrideToday()" class="w-full bg-violet-600 text-white font-bold py-3 rounded-xl hover:bg-violet-700 transition text-[10px]"><i class="fas fa-check mr-1.5"></i> Simpan Override Hari Ini</button>
+                        <button onclick="clearWorkScheduleOverrideToday()" class="w-full bg-slate-100 text-slate-600 border border-slate-200 font-bold py-3 rounded-xl hover:bg-slate-200 transition text-[10px]"><i class="fas fa-rotate-left mr-1.5"></i> Kembali ke Template</button>
+                    </div>
                 </div>
             </div>
 
@@ -762,49 +973,47 @@
                 </div>
             </div>
 
-            <!-- DASBOR GRAFIK TREN KINERJA -->
-            <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-chart-line mr-2 text-blue-500"></i> Tren Kinerja</h3>
-                    <select id="chartTimeframe" onchange="loadChartData(this.value)" class="text-[10px] font-bold text-blue-900 bg-blue-50 border border-blue-200 rounded-xl px-2 py-1.5 outline-none cursor-pointer shadow-sm">
-                        <option value="7">7 Hari (Pekan Ini)</option>
-                        <option value="30">30 Hari (Bulan Ini)</option>
-                        <option value="180">180 Hari (1 Semester)</option>
-                    </select>
+            </section>
+
+            <!-- TAB: DATA & AKUN -->
+            <section id="admin-tab-data" class="admin-tab-view hidden animate-fade-in">
+            <div class="flex items-center justify-between gap-3 mb-4 px-2">
+                <div>
+                    <div class="text-[9px] font-black text-blue-600 uppercase tracking-[0.14em]">Pengelolaan Data</div>
+                    <h2 class="text-[15px] font-black text-blue-950">Kamar, Santri & Akun Musyrif</h2>
                 </div>
-                <div class="relative h-44 w-full">
-                    <canvas id="performanceChart"></canvas>
-                    <div id="chartLoading" class="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-xl hidden z-10">
-                        <div class="flex flex-col items-center">
-                            <i class="fas fa-circle-notch fa-spin text-blue-500 text-3xl mb-2"></i>
-                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Memuat Grafik...</span>
+                <button onclick="openAkunModal()" class="flex items-center text-[10px] bg-blue-100 text-blue-700 px-3 py-2 rounded-xl font-extrabold border border-blue-200 shadow-sm hover:bg-blue-200 transition shrink-0" title="Buat Akun Musyrif">
+                    <i class="fas fa-user-plus mr-1.5"></i> Akun
+                </button>
+            </div>
+            <!-- MANAJEMEN KAMAR (DISTRIBUSI SANTRI) -->
+            <div class="glass-card p-5 rounded-[2rem] mb-6 shadow-sm border border-slate-100">
+                <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center mb-4"><i class="fas fa-users-cog mr-2 text-blue-500"></i> Manajemen Kamar & Distribusi Santri</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Pilih / Buat Kamar Baru</label>
+                        <select id="adminRoomSelect" onchange="loadRoomData(this.value)" class="w-full text-[12px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-400 mb-2">
+                            <option value="">-- Buat Kamar Baru --</option>
+                        </select>
+                        <input type="text" id="adminRoomName" placeholder="Contoh: Kamar Abu Bakar" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Tugaskan Musyrif (Bisa lebih dari 1)</label>
+                        <div id="adminRoomMusyrifs" class="max-h-32 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-2 space-y-1">
+                            <div class="text-[11px] text-slate-500">Memuat musyrif...</div>
                         </div>
                     </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-blue-900 uppercase mb-1">Daftar Santri (Pisahkan dengan Enter)</label>
+                        <textarea id="adminSantriInput" rows="4" placeholder="Ahmad Fauzi&#10;Budi Santoso&#10;Hasan Basri" class="w-full text-[12px] p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"></textarea>
+                    </div>
+                    <button onclick="saveRoomData()" id="btnSaveRoom" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-md flex items-center justify-center text-[12px]">
+                        <i class="fas fa-save mr-2"></i> Simpan Data Kamar
+                    </button>
                 </div>
             </div>
 
-            <div class="mb-8">
-                <h3 class="text-[12px] font-extrabold text-blue-950 uppercase tracking-[0.1em] mb-3 px-2 flex items-center">
-                    <i class="fas fa-mosque mr-2 text-blue-500"></i> Waktu Salat Hari Ini
-                </h3>
-                <div class="flex space-x-3 overflow-x-auto pb-2 px-1 no-scrollbar" id="prayerTimesContainerAdmin"></div>
-            </div>
-            <div class="flex items-center justify-between mb-6 px-2">
-                <h2 class="text-[15px] font-black text-blue-950 uppercase tracking-[0.15em]">Kinerja Musyrif</h2>
-                <div class="flex space-x-2 items-center">
-                    <input type="date" id="adminDateSelector" onchange="changeAdminDate(this.value)" class="text-[10px] font-bold text-blue-900 bg-white border border-blue-200 rounded-xl px-2 py-1.5 outline-none shadow-sm cursor-pointer">
-                    <button onclick="openAkunModal()" class="flex items-center text-[10px] bg-blue-100 text-blue-700 px-3 py-1.5 rounded-xl font-extrabold border border-blue-200 shadow-sm hover:bg-blue-200 transition" title="Buat Akun Musyrif">
-                        <i class="fas fa-user-plus mr-1.5"></i> Akun
-                    </button>
-                    <button onclick="openRekapModal()" class="flex items-center text-[10px] bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl font-extrabold border border-indigo-200 shadow-sm hover:bg-indigo-200 transition" title="Unduh Rekap Rentang Waktu">
-                        <i class="fas fa-download mr-1.5"></i> Rekap
-                    </button>
-                    <span id="adminLiveBadge" class="flex items-center text-[11px] text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl font-extrabold border border-emerald-200 shadow-sm">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span> LIVE SYNC
-                    </span>
-                </div>
-            </div>
-            <div id="adminListContainer" class="space-y-5"></div>
+            </section>
         </main>
     </div>
 
@@ -841,6 +1050,46 @@
         let musyrifListState = {}; 
         let globalRooms = {};
         let adminRoomStates = {};
+
+        // === PAYROLL & VALIDASI POTONGAN ===
+        window.payrollConfig = { flatForgotPenalty: 1000, users: {} };
+        window.payrollConfigLoaded = false;
+        window.payrollLastReport = null;
+        window.payrollLoading = false;
+        window.payrollPrayerCache = {};
+        window.payrollCityId = null;
+
+        // Navigasi tab khusus halaman Pimpinan. Hanya mengatur tampilan; fungsi/data lama tetap sama.
+        window.switchAdminTab = function(tabName) {
+            const validTabs = ['ringkasan', 'kinerja', 'payroll', 'jadwal', 'data'];
+            if (!validTabs.includes(tabName)) tabName = 'ringkasan';
+
+            validTabs.forEach(name => {
+                const view = document.getElementById(`admin-tab-${name}`);
+                const btn = document.getElementById(`admin-tab-btn-${name}`);
+                const active = name === tabName;
+                if (view) view.classList.toggle('hidden', !active);
+                if (btn) {
+                    btn.classList.toggle('bg-blue-600', active);
+                    btn.classList.toggle('text-white', active);
+                    btn.classList.toggle('shadow-md', active);
+                    btn.classList.toggle('text-slate-500', !active);
+                    if (!active) {
+                        btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+                    }
+                }
+            });
+
+            // Chart mungkin dibuat saat tab masih tersembunyi; resize saat tab Kinerja dibuka.
+            if (tabName === 'kinerja') {
+                setTimeout(() => {
+                    try { if (performanceChart) performanceChart.resize(); } catch (_) {}
+                }, 80);
+            }
+            if (tabName === 'payroll') {
+                setTimeout(() => { if (window.loadPayrollDashboard) window.loadPayrollDashboard(false); }, 50);
+            }
+        };
 
         window.togglePasswordVisibility = function(inputId, iconId) {
             const passInput = document.getElementById(inputId);
@@ -957,6 +1206,18 @@
         let auditRecentUnsubscribe = null;
         let presenceAdminUnsubscribe = null;
         let presenceHeartbeatInterval = null;
+        let workSchedulePatternUnsubscribe = null;
+        let workScheduleOverrideUnsubscribe = null;
+        window.workScheduleTemplate = null;
+        window.workScheduleTemplateExists = false;
+        window.workScheduleTodayOverride = null;
+        window.workScheduleOverrideDateKey = null;
+        window.defaultWorkScheduleNames = {
+            week13: ['Fatihatul Firdaus', 'Rangga Abdul Barii'],
+            week24: ['Musa', 'Suti awan'],
+            week5Morning: ['Fatihatul Firdaus', 'Rangga Abdul Barii'],
+            week5Evening: ['Musa', 'Suti awan']
+        };
         window.auditRecentLogs = [];
         window.auditPresence = {};
         window.auditHistoryLogs = [];
@@ -1035,7 +1296,7 @@
                 login:'fa-right-to-bracket text-emerald-600', logout:'fa-right-from-bracket text-slate-500',
                 checklist:'fa-square-check text-blue-600', attendance:'fa-users text-violet-600', incident:'fa-clipboard-list text-amber-600',
                 handover:'fa-right-left text-indigo-600', missed_reason:'fa-circle-exclamation text-rose-600', note:'fa-note-sticky text-amber-600',
-                student:'fa-user-graduate text-cyan-600', room:'fa-door-open text-blue-700', sop:'fa-pen-to-square text-fuchsia-600', account:'fa-user-gear text-slate-700'
+                student:'fa-user-graduate text-cyan-600', room:'fa-door-open text-blue-700', sop:'fa-pen-to-square text-fuchsia-600', account:'fa-user-gear text-slate-700', schedule:'fa-calendar-days text-cyan-700', payroll:'fa-money-check-dollar text-emerald-700'
             };
             return map[type] || 'fa-circle-info text-slate-500';
         };
@@ -1229,6 +1490,832 @@
             if (list) list.innerHTML = window.renderAuditRows(logs);
             const count = document.getElementById('auditHistoryCount');
             if (count) count.textContent = `${window.auditHistoryLogs.length} aktivitas dimuat • ${logs.length} cocok filter`;
+        };
+
+        // ==========================
+        // PAYROLL: SOP POTONGAN GAJI ISYRAF
+        // ==========================
+        window.formatRupiah = function(value) {
+            const n = Math.round(Number(value) || 0);
+            return 'Rp' + n.toLocaleString('id-ID');
+        };
+
+        window.getDefaultHourlyRate = function(name) {
+            const n = window.normalizeMusyrifName ? window.normalizeMusyrifName(name) : String(name||'').toLowerCase().trim();
+            if (n === 'suti awan') return 5615;
+            if (n === 'fatihatul firdaus') return 5615;
+            if (n === 'rangga abdul barii') return 5615;
+            if (n === 'musa') return 3369;
+            return 0;
+        };
+
+        window.getPayrollUserConfig = function(uid, name = '') {
+            const saved = window.payrollConfig?.users?.[uid] || {};
+            const rate = Number(saved.hourlyRate);
+            const base = Number(saved.baseSalary);
+            return {
+                hourlyRate: Number.isFinite(rate) && rate >= 0 ? rate : window.getDefaultHourlyRate(name),
+                baseSalary: Number.isFinite(base) && base >= 0 ? base : 0
+            };
+        };
+
+        window.ensurePayrollConfig = async function() {
+            if (window.payrollConfigLoaded) return window.payrollConfig;
+            try {
+                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'payroll_config');
+                const snap = await getDoc(ref);
+                if (snap.exists()) {
+                    const d = snap.data() || {};
+                    window.payrollConfig = {
+                        flatForgotPenalty: Number(d.flatForgotPenalty) >= 0 ? Number(d.flatForgotPenalty) : 1000,
+                        users: d.users && typeof d.users === 'object' ? d.users : {}
+                    };
+                }
+            } catch(e) { console.warn('Load payroll config:', e); }
+            window.payrollConfigLoaded = true;
+            window.renderPayrollConfigUI();
+            return window.payrollConfig;
+        };
+
+        window.renderPayrollConfigUI = function() {
+            const box = document.getElementById('payrollConfigUsers');
+            const penalty = document.getElementById('payrollForgotPenalty');
+            if (penalty && document.activeElement !== penalty) penalty.value = Math.round(Number(window.payrollConfig?.flatForgotPenalty) || 1000);
+            if (!box) return;
+            const users = [...(window.adminAllMusyrifs || [])].sort((a,b)=>(a.name||'').localeCompare(b.name||'','id'));
+            if (!users.length) {
+                box.innerHTML = '<div class="text-[10px] font-bold text-slate-400 py-3">Belum ada akun Musyrif terdaftar.</div>';
+                return;
+            }
+            box.innerHTML = users.map(m => {
+                const cfg = window.getPayrollUserConfig(m.id, m.name);
+                return `<div class="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_160px_190px] gap-2 items-center bg-slate-50/70 border border-slate-100 rounded-2xl p-3">
+                    <div class="min-w-0"><div class="text-[11px] font-black text-blue-950">${window.escapeHtml(m.name || 'Musyrif')}</div><div class="text-[9px] font-semibold text-slate-400 truncate">${window.escapeHtml(m.email || '')}</div></div>
+                    <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji / Jam</label><input data-payroll-rate="${m.id}" type="number" min="0" step="1" value="${cfg.hourlyRate}" class="w-full text-[10px] font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-300"></div>
+                    <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji Pokok Bulanan</label><input data-payroll-base="${m.id}" type="number" min="0" step="1000" value="${cfg.baseSalary}" placeholder="Opsional" class="w-full text-[10px] font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-300"></div>
+                </div>`;
+            }).join('');
+        };
+
+        window.savePayrollConfig = async function() {
+            if (currentRole !== 'admin') return showToast('Hanya Pimpinan yang dapat mengubah pengaturan payroll.', 'error');
+            const users = {};
+            (window.adminAllMusyrifs || []).forEach(m => {
+                const rateEl = document.querySelector(`[data-payroll-rate="${m.id}"]`);
+                const baseEl = document.querySelector(`[data-payroll-base="${m.id}"]`);
+                users[m.id] = {
+                    name: m.name || 'Musyrif',
+                    hourlyRate: Math.max(0, Number(rateEl?.value) || 0),
+                    baseSalary: Math.max(0, Number(baseEl?.value) || 0)
+                };
+            });
+            const flatForgotPenalty = Math.max(0, Number(document.getElementById('payrollForgotPenalty')?.value) || 1000);
+            window.payrollConfig = { flatForgotPenalty, users };
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'payroll_config'), {
+                    flatForgotPenalty, users, updatedAt: serverTimestamp(), updatedBy: localDevUid || ''
+                }, { merge: true });
+                await window.logActivity('payroll', 'Memperbarui pengaturan gaji dan denda tidak ceklis.', { flatForgotPenalty });
+                showToast('Pengaturan payroll berhasil disimpan.', 'success');
+                window.payrollLastReport = null;
+                await window.loadPayrollDashboard(true);
+            } catch(e) {
+                console.error('Save payroll config:', e);
+                showToast('Gagal menyimpan pengaturan payroll.', 'error');
+            }
+        };
+
+        window.getPayrollPeriod = function(monthValue) {
+            let y, m;
+            if (/^\d{4}-\d{2}$/.test(monthValue || '')) {
+                [y,m] = monthValue.split('-').map(Number);
+            } else {
+                const now = new Date();
+                const boundary = now.getDate() >= 26 ? new Date(now.getFullYear(), now.getMonth()+1, 26) : new Date(now.getFullYear(), now.getMonth(), 26);
+                y = boundary.getFullYear();
+                m = boundary.getMonth() + 1;
+            }
+            // Batas periode berikutnya adalah tanggal 26 pukul 00.00. Agar tidak tumpang tindih,
+            // data periode berjalan dihitung sampai sesaat sebelum tanggal 26 tersebut (efektif 26–25).
+            const boundaryEnd = new Date(y, m-1, 26, 0,0,0,0);
+            const end = new Date(boundaryEnd.getTime() - 1);
+            const start = new Date(y, m-2, 26, 0,0,0,0);
+            return { start, end, boundaryEnd, monthValue:`${y}-${String(m).padStart(2,'0')}` };
+        };
+
+        window.setDefaultPayrollPeriod = function() {
+            const el = document.getElementById('payrollPeriodMonth');
+            if (!el) return;
+            if (!el.value) el.value = window.getPayrollPeriod('').monthValue;
+            const p = window.getPayrollPeriod(el.value);
+            const badge = document.getElementById('payrollPeriodBadge');
+            if (badge) badge.textContent = `${window.getYYYYMMDD(p.start)} → ${window.getYYYYMMDD(p.boundaryEnd)}`;
+            const sub = document.getElementById('payrollSummarySubtitle');
+            if (sub) sub.textContent = `Periode ${window.getYYYYMMDD(p.start)} sampai sebelum ${window.getYYYYMMDD(p.boundaryEnd)} • berganti setiap tanggal 26`;
+        };
+
+        window.getTaskDurationMinutes = function(task) {
+            let s = window.timeToMinutes(task?.start || '00:00');
+            let e = window.timeToMinutes(task?.end || '00:00');
+            if (e < s) e += 1440;
+            return Math.max(0, e - s);
+        };
+
+        window.getMissedDecision = function(reasonObj) {
+            const v = reasonObj?.validation || {};
+            const raw = v.decision || v.status || '';
+            // Kompatibilitas dengan data versi lama.
+            if (raw === 'forgot') return 'invalid_worked';
+            if (raw === 'invalid') return 'invalid_not_done';
+            return ['valid','invalid_worked','invalid_not_done'].includes(raw) ? raw : '';
+        };
+
+        window.getMissedStatusLabel = function(reasonObj) {
+            if (!reasonObj) return 'Tidak Dikerjakan';
+            const d = window.getMissedDecision(reasonObj);
+            if (d === 'valid') return 'Uzur Valid';
+            if (d === 'invalid_worked') return 'Tidak Ceklis — Tugas Dikerjakan';
+            if (d === 'invalid_not_done') return 'Tidak Dikerjakan';
+            return 'Menunggu Validasi Pimpinan';
+        };
+
+        window.getPayrollTaskEvaluation = function({uid, name, task, missedReason, isChecked=false, isLeave=false, ended=true}) {
+            const cfg = window.getPayrollUserConfig(uid, name);
+            const durationMinutes = window.getTaskDurationMinutes(task);
+            const workDeduction = Math.round((durationMinutes / 60) * cfg.hourlyRate);
+            const noCheckDeduction = Math.round(Number(window.payrollConfig?.flatForgotPenalty) || 1000);
+            const maximumDeduction = noCheckDeduction + workDeduction;
+
+            if (isLeave || isChecked || !ended) {
+                return {
+                    status:isLeave?'Libur':(isChecked?'Dikerjakan':'Menunggu'),
+                    deduction:0, noCheckDeduction:0, workDeduction:0, pendingPotential:0,
+                    lostMinutes:0, durationMinutes, maximumDeduction
+                };
+            }
+
+            // Tidak ceklis tanpa alasan: otomatis dianggap tidak dikerjakan.
+            // Berlaku DUA potongan: Rp1.000 tidak ceklis + potongan jam tugas.
+            if (!missedReason) {
+                return {
+                    status:'Tidak Dikerjakan', deduction:maximumDeduction,
+                    noCheckDeduction, workDeduction, pendingPotential:0,
+                    lostMinutes:durationMinutes, durationMinutes, maximumDeduction
+                };
+            }
+
+            const d = window.getMissedDecision(missedReason);
+            if (d === 'valid') {
+                return { status:'Uzur Valid', deduction:0, noCheckDeduction:0, workDeduction:0, pendingPotential:0, lostMinutes:0, durationMinutes, maximumDeduction };
+            }
+            // Alasan ditolak, tetapi tugas terbukti dikerjakan: hanya denda tidak ceklis Rp1.000.
+            if (d === 'invalid_worked') {
+                return { status:'Tidak Ceklis — Tugas Dikerjakan', deduction:noCheckDeduction, noCheckDeduction, workDeduction:0, pendingPotential:0, lostMinutes:0, durationMinutes, maximumDeduction };
+            }
+            // Alasan ditolak dan tugas tidak dikerjakan: kedua potongan berlaku.
+            if (d === 'invalid_not_done') {
+                return { status:'Tidak Dikerjakan', deduction:maximumDeduction, noCheckDeduction, workDeduction, pendingPotential:0, lostMinutes:durationMinutes, durationMinutes, maximumDeduction };
+            }
+            // Ada alasan namun belum divalidasi: seluruh potongan ditahan.
+            return { status:'Menunggu Validasi Pimpinan', deduction:0, noCheckDeduction:0, workDeduction:0, pendingPotential:maximumDeduction, lostMinutes:0, durationMinutes, maximumDeduction };
+        };
+
+        window.renderMissedValidationStatus = function(reasonObj) {
+            if (!reasonObj) return '';
+            const d = window.getMissedDecision(reasonObj);
+            if (d === 'valid') return '<span class="text-[8px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg">UZUR VALID • BEBAS POTONGAN</span>';
+            if (d === 'invalid_worked') return '<span class="text-[8px] font-black text-amber-700 bg-amber-100 px-2 py-1 rounded-lg">ALASAN DITOLAK • TUGAS DIKERJAKAN</span>';
+            if (d === 'invalid_not_done') return '<span class="text-[8px] font-black text-rose-700 bg-rose-100 px-2 py-1 rounded-lg">ALASAN DITOLAK • TUGAS TIDAK DIKERJAKAN</span>';
+            return '<span class="text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-1 rounded-lg">MENUNGGU VALIDASI</span>';
+        };
+
+        window.validateMissedTask = async function(uid, taskId, decision, dateKey = window.adminSelectedDate) {
+            if (currentRole !== 'admin') return showToast('Hanya Pimpinan yang dapat memvalidasi alasan.', 'error');
+            if (!['valid','invalid_worked','invalid_not_done'].includes(decision)) return;
+            try {
+                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'states_' + dateKey, uid);
+                const snap = await getDoc(ref);
+                if (!snap.exists()) return showToast('Data tugas tidak ditemukan.', 'error');
+                const data = snap.data() || {};
+                const reasons = { ...(data.missedReasons || {}) };
+                const key = Object.prototype.hasOwnProperty.call(reasons, taskId) ? taskId : String(taskId);
+                if (!reasons[key]) return showToast('Musyrif belum mengisi alasan untuk tugas ini.', 'error');
+                const actorName = localStorage.getItem('isyrafUserName') || 'Pimpinan';
+                reasons[key] = {
+                    ...reasons[key],
+                    validation: {
+                        decision,
+                        validatedByUid: localDevUid || '',
+                        validatedByName: actorName,
+                        validatedAt: new Date().toISOString()
+                    }
+                };
+                await setDoc(ref, { missedReasons: reasons, lastUpdate: serverTimestamp() }, { merge:true });
+                const labels = {
+                    valid:'Uzur Valid — Bebas Potongan',
+                    invalid_worked:'Alasan Ditolak — Tugas Dikerjakan (Potongan Tidak Ceklis Rp1.000)',
+                    invalid_not_done:'Alasan Ditolak — Tugas Tidak Dikerjakan (Rp1.000 + Potongan Jam Tugas)'
+                };
+                await window.logActivity('payroll', `Validasi tugas terlewat: ${labels[decision]}.`, { uid, taskId, dateKey, decision });
+                showToast(`Keputusan disimpan: ${labels[decision]}.`, 'success');
+                window.payrollLastReport = null;
+                if (document.getElementById('admin-tab-payroll') && !document.getElementById('admin-tab-payroll').classList.contains('hidden')) await window.loadPayrollDashboard(true);
+            } catch(e) {
+                console.error('Validate missed task:', e);
+                showToast('Gagal menyimpan validasi.', 'error');
+            }
+        };
+
+        window.getPrayerTimesForPayrollDate = async function(dateKey) {
+            if (window.payrollPrayerCache[dateKey]) return window.payrollPrayerCache[dateKey];
+            try {
+                if (!window.payrollCityId) {
+                    const cityRes = await fetch('https://api.myquran.com/v2/sholat/kota/cari/Lahat');
+                    const cityData = await cityRes.json();
+                    window.payrollCityId = cityData.data?.[0]?.id || null;
+                }
+                const [y,m,d] = dateKey.split('-');
+                if (window.payrollCityId) {
+                    const res = await fetch(`https://api.myquran.com/v2/sholat/jadwal/${window.payrollCityId}/${y}/${m}/${d}`);
+                    const data = await res.json();
+                    const p = data.data?.jadwal;
+                    if (p) {
+                        const out = { subuh:p.subuh, dzuhur:p.dzuhur, ashar:p.ashar, maghrib:p.maghrib, isya:p.isya };
+                        window.payrollPrayerCache[dateKey] = out;
+                        return out;
+                    }
+                }
+            } catch(e) { console.warn('Prayer payroll fallback', dateKey, e); }
+            const fallback = Object.keys(globalPrayers || {}).length ? globalPrayers : {subuh:'04:50',dzuhur:'12:10',ashar:'15:30',maghrib:'18:15',isya:'19:30'};
+            window.payrollPrayerCache[dateKey] = fallback;
+            return fallback;
+        };
+
+        window.getPayrollOverrideForDate = async function(dateKey) {
+            try {
+                const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'work_schedule_overrides', dateKey));
+                return snap.exists() ? snap.data() : null;
+            } catch(e) { return null; }
+        };
+
+        window.isUserOffForPayrollTask = function(uid, task, dateObj, name, overrideData) {
+            if (!task?.start) return false;
+            const day=dateObj.getDay(), week=window.getWorkWeekNumber(dateObj), start=window.timeToMinutes(task.start);
+            const ov = overrideData && overrideData.dateKey === window.getYYYYMMDD(dateObj) ? overrideData : null;
+            const mode = ov?.entries?.[uid]?.mode;
+            let intervals=[];
+            const regularOff=()=> day===6?[{start:1020,end:1440}]:day===0?[{start:0,end:1020}]:[{start:0,end:1440}];
+            if (mode && mode !== 'follow') {
+                if (mode==='duty') intervals=[];
+                else if(mode==='off_full') intervals=[{start:0,end:1440}];
+                else if(mode==='off_regular') intervals=regularOff();
+                else if(mode==='off_morning') intervals=[{start:230,end:760}];
+                else if(mode==='off_evening') intervals=[{start:900,end:1320}];
+            } else {
+                const pattern=window.getEffectiveWorkSchedulePattern();
+                const norm=window.normalizeMusyrifName(name);
+                const inGroup=(uidKey,nameKey)=> (pattern[uidKey]||[]).includes(uid) || (pattern[nameKey]||[]).some(n=>window.normalizeMusyrifName(n)===norm);
+                if(week<=4){
+                    const off=(week===1||week===3)?inGroup('week13OffUids','week13OffNames'):inGroup('week24OffUids','week24OffNames');
+                    if(off&&(day===6||day===0)) intervals=regularOff();
+                } else if(week===5&&day===0){
+                    if(inGroup('week5MorningOffUids','week5MorningOffNames')) intervals.push({start:230,end:760});
+                    if(inGroup('week5EveningOffUids','week5EveningOffNames')) intervals.push({start:900,end:1320});
+                }
+            }
+            return intervals.some(x=>start>=x.start&&start<x.end);
+        };
+
+        window.buildPayrollReport = async function(monthValue) {
+            await window.ensurePayrollConfig();
+            const period = window.getPayrollPeriod(monthValue);
+            const today = new Date(); today.setHours(23,59,59,999);
+            const through = period.end < today ? period.end : today;
+            const users=[...(window.adminAllMusyrifs||[])];
+            const summaries={};
+            users.forEach(m=>{
+                const cfg=window.getPayrollUserConfig(m.id,m.name);
+                summaries[m.id]={
+                    uid:m.id,name:m.name||'Musyrif',email:m.email||'',hourlyRate:cfg.hourlyRate,baseSalary:cfg.baseSalary,
+                    deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
+                    missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,autoNoReasonCount:0,details:[]
+                };
+            });
+            const pending=[];
+            let cursor=new Date(period.start);
+            while(cursor<=through){
+                const dateObj=new Date(cursor); dateObj.setHours(12,0,0,0);
+                const dateKey=window.getYYYYMMDD(dateObj);
+                const [prayers,statesSnap,overrideData] = await Promise.all([
+                    window.getPrayerTimesForPayrollDate(dateKey),
+                    getDocs(query(collection(db,'artifacts',appId,'public','data','states_'+dateKey))),
+                    window.getPayrollOverrideForDate(dateKey)
+                ]);
+                const states={}; statesSnap.forEach(d=>states[d.id]=d.data()||{});
+                const sched=generateSchedule(prayers,dateObj.getDay());
+                for(const m of users){
+                    const sum=summaries[m.id]; const st=states[m.id]||{};
+                    for(const task of sched){
+                        if(task.noCheck || (task.noCheckOn&&task.noCheckOn.includes(dateObj.getDay()))) continue;
+                        if(window.isUserOffForPayrollTask(m.id,task,dateObj,m.name||'Musyrif',overrideData)) continue;
+                        const checked=!!(st.checklist&&st.checklist[task.id]);
+                        if(checked) continue;
+                        if (dateKey === window.getYYYYMMDD()) {
+                            const nowForTask = new Date();
+                            const endForTask = parseTime(task.end, nowForTask);
+                            if (nowForTask < endForTask) continue;
+                        }
+                        sum.missedChecklistCount++;
+                        const reason=st.missedReasons&&(st.missedReasons[task.id]||st.missedReasons[String(task.id)]);
+                        const ev=window.getPayrollTaskEvaluation({uid:m.id,name:m.name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true});
+                        if(ev.status==='Tidak Dikerjakan'){
+                            sum.deductionNoCheck+=ev.noCheckDeduction;
+                            sum.deductionWork+=ev.workDeduction;
+                            sum.totalDeduction+=ev.deduction;
+                            sum.lostMinutes+=ev.lostMinutes;
+                            sum.noCheckPenaltyCount++;
+                            sum.notDoneCount++;
+                            if(!reason) sum.autoNoReasonCount++;
+                        } else if(ev.status==='Tidak Ceklis — Tugas Dikerjakan'){
+                            sum.deductionNoCheck+=ev.noCheckDeduction;
+                            sum.totalDeduction+=ev.deduction;
+                            sum.noCheckPenaltyCount++;
+                            sum.workedWithoutCheckCount++;
+                        } else if(ev.status==='Uzur Valid') {
+                            sum.validCount++;
+                        } else if(ev.status==='Menunggu Validasi Pimpinan'){
+                            sum.pendingPotential+=ev.pendingPotential;
+                            sum.pendingCount++;
+                            pending.push({
+                                dateKey,uid:m.id,name:m.name||'Musyrif',taskId:task.id,taskTitle:task.title,start:task.start,end:task.end,reason,
+                                maximumDeduction:ev.maximumDeduction,
+                                noCheckPotential:Math.round(Number(window.payrollConfig?.flatForgotPenalty)||1000),
+                                workPotential:Math.round((window.getTaskDurationMinutes(task)/60)*window.getPayrollUserConfig(m.id,m.name).hourlyRate)
+                            });
+                        }
+                        if(ev.status!=='Dikerjakan') sum.details.push({
+                            dateKey,taskId:task.id,taskTitle:task.title,start:task.start,end:task.end,status:ev.status,
+                            deduction:ev.deduction,noCheckDeduction:ev.noCheckDeduction||0,workDeduction:ev.workDeduction||0,
+                            pendingPotential:ev.pendingPotential,lostMinutes:ev.lostMinutes,reason
+                        });
+                    }
+                }
+                cursor.setDate(cursor.getDate()+1);
+            }
+            return { period, through, summaries:Object.values(summaries), pending, generatedAt:new Date() };
+        };
+
+        window.renderPayrollReport = function(report) {
+            window.payrollLastReport=report;
+            const p=report.period;
+            const badge=document.getElementById('payrollPeriodBadge'); if(badge) badge.textContent=`${window.getYYYYMMDD(p.start)} → ${window.getYYYYMMDD(p.boundaryEnd)}`;
+            const sub=document.getElementById('payrollSummarySubtitle'); if(sub) sub.textContent=`Periode ${window.getYYYYMMDD(p.start)} sampai sebelum ${window.getYYYYMMDD(p.boundaryEnd)} • Data s.d. ${window.getYYYYMMDD(report.through)}`;
+            const pendingCount=document.getElementById('payrollPendingCount'); if(pendingCount) pendingCount.textContent=`${report.pending.length} pending`;
+            const pend=document.getElementById('payrollPendingValidation');
+            if(pend){
+                pend.innerHTML = report.pending.length ? report.pending.map(x=>`<div class="border border-violet-100 bg-violet-50/50 rounded-2xl p-3">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="text-[9px] font-black text-violet-600">${window.escapeHtml(x.dateKey)} • ${window.escapeHtml(x.start)}–${window.escapeHtml(x.end)}</div>
+                            <div class="text-[11px] font-black text-blue-950 mt-0.5">${window.escapeHtml(x.name)} — ${window.escapeHtml(x.taskTitle)}</div>
+                            <div class="text-[10px] font-semibold text-slate-600 mt-1">${window.escapeHtml(x.reason?.reason||'')} ${x.reason?.detail?`— ${window.escapeHtml(x.reason.detail)}`:''}</div>
+                            <div class="text-[9px] font-bold text-slate-400 mt-1">Jika tugas dikerjakan: ${window.formatRupiah(x.noCheckPotential)} • Jika tidak dikerjakan: ${window.formatRupiah(x.maximumDeduction)}</div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 shrink-0">
+                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'valid','${x.dateKey}')" class="text-[9px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-2 rounded-xl">Valid</button>
+                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'invalid_worked','${x.dateKey}')" class="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-2 rounded-xl">Invalid • Dikerjakan</button>
+                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'invalid_not_done','${x.dateKey}')" class="text-[9px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-2.5 py-2 rounded-xl">Invalid • Tidak Dikerjakan</button>
+                        </div>
+                    </div></div>`).join('') : '<div class="text-center text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-2xl py-4"><i class="fas fa-check-circle mr-1"></i> Tidak ada alasan yang menunggu validasi pada periode ini.</div>';
+            }
+            const box=document.getElementById('payrollSummaryContainer');
+            if(box){
+                box.innerHTML=report.summaries.map(s=>{
+                    const net=s.baseSalary>0?Math.max(0,s.baseSalary-s.totalDeduction):null;
+                    const periodClosed = report.period.boundaryEnd <= new Date();
+                    const finalStatus=s.pendingCount?'<span class="text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-1 rounded-lg">BELUM FINAL</span>':(periodClosed?'<span class="text-[8px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg">FINAL</span>':'<span class="text-[8px] font-black text-blue-700 bg-blue-100 px-2 py-1 rounded-lg">SEMENTARA</span>');
+                    return `<div class="border border-slate-100 bg-white/70 rounded-2xl p-4">
+                        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3"><div><div class="flex items-center gap-2 flex-wrap"><div class="text-[13px] font-black text-blue-950">${window.escapeHtml(s.name)}</div>${finalStatus}</div><div class="text-[9px] font-bold text-slate-400 mt-1">${window.formatRupiah(s.hourlyRate)}/jam • ${s.baseSalary>0?'Gaji pokok '+window.formatRupiah(s.baseSalary):'Gaji pokok belum diatur'}</div></div><div class="text-left lg:text-right"><div class="text-[9px] font-black text-slate-400 uppercase">Total Potongan Final</div><div class="text-xl font-black text-rose-600">${window.formatRupiah(s.totalDeduction)}</div></div></div>
+                        <div class="grid grid-cols-2 lg:grid-cols-6 gap-2 mt-4">
+                            <div class="bg-amber-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-amber-600 uppercase">Denda Tidak Ceklis</div><div class="text-[11px] font-black text-amber-800 mt-0.5">${window.formatRupiah(s.deductionNoCheck)}</div></div>
+                            <div class="bg-rose-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-[11px] font-black text-rose-800 mt-0.5">${window.formatRupiah(s.deductionWork)}</div></div>
+                            <div class="bg-violet-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-violet-600 uppercase">Potensi Ditahan</div><div class="text-[11px] font-black text-violet-800 mt-0.5">${window.formatRupiah(s.pendingPotential)}</div></div>
+                            <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-slate-500 uppercase">Tidak Ceklis</div><div class="text-[11px] font-black text-slate-700 mt-0.5">${s.missedChecklistCount} tugas</div></div>
+                            <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-slate-500 uppercase">Jam Hilang</div><div class="text-[11px] font-black text-slate-700 mt-0.5">${(s.lostMinutes/60).toFixed(2)} jam</div></div>
+                            <div class="bg-emerald-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-emerald-600 uppercase">Gaji Bersih</div><div class="text-[11px] font-black text-emerald-800 mt-0.5">${net===null?'—':window.formatRupiah(net)}</div></div>
+                        </div>
+                        <div class="text-[9px] font-bold text-slate-400 mt-3">${s.missedChecklistCount} tugas tidak diceklis • ${s.notDoneCount} tugas tidak dikerjakan • ${s.workedWithoutCheckCount} tugas dikerjakan tanpa ceklis • ${s.validCount} uzur valid • ${s.pendingCount} menunggu validasi</div>
+                    </div>`;
+                }).join('') || '<div class="text-center text-[10px] text-slate-400 font-bold py-6">Belum ada akun Musyrif.</div>';
+            }
+        };
+
+        window.loadPayrollDashboard = async function(force=false) {
+            if(currentRole!=='admin') return;
+            if(window.payrollLoading) return;
+            if (!(window.adminAllMusyrifs || []).length && window.loadAdminSantriManager) await window.loadAdminSantriManager();
+            window.setDefaultPayrollPeriod();
+            await window.ensurePayrollConfig();
+            window.renderPayrollConfigUI();
+            const month=document.getElementById('payrollPeriodMonth')?.value || window.getPayrollPeriod('').monthValue;
+            if(!force && window.payrollLastReport?.period?.monthValue===month){ window.renderPayrollReport(window.payrollLastReport); return; }
+            window.payrollLoading=true;
+            const sum=document.getElementById('payrollSummaryContainer'); if(sum) sum.innerHTML='<div class="text-center text-[11px] font-bold text-slate-400 py-8"><i class="fas fa-circle-notch fa-spin mr-2"></i> Menghitung tugas dan potongan periode berjalan...</div>';
+            const pend=document.getElementById('payrollPendingValidation'); if(pend) pend.innerHTML='<div class="text-center text-[10px] font-bold text-slate-400 py-5"><i class="fas fa-circle-notch fa-spin mr-2"></i> Memuat validasi...</div>';
+            try { const report=await window.buildPayrollReport(month); window.renderPayrollReport(report); }
+            catch(e){ console.error('Payroll report:',e); if(sum) sum.innerHTML='<div class="text-center text-[10px] text-rose-600 font-bold py-6">Gagal menghitung payroll. Periksa koneksi atau Firestore Rules.</div>'; }
+            finally{ window.payrollLoading=false; }
+        };
+
+        window.exportPayrollCsv = async function() {
+            if(!window.payrollLastReport) await window.loadPayrollDashboard(true);
+            const r=window.payrollLastReport; if(!r) return showToast('Data payroll belum tersedia.','error');
+            const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+            let csv='Periode,Nama Musyrif,Gaji per Jam,Gaji Pokok,Jumlah Tidak Ceklis,Denda Tidak Ceklis,Jumlah Tugas Tidak Dikerjakan,Jam Tidak Dikerjakan,Potongan Tidak Dikerjakan,Potensi Potongan Ditahan,Jumlah Pending,Total Potongan Final,Gaji Bersih,Status Payroll\n';
+            r.summaries.forEach(s=>{
+                const net=s.baseSalary>0?Math.max(0,s.baseSalary-s.totalDeduction):'';
+                csv += [
+                    `${window.getYYYYMMDD(r.period.start)} sampai sebelum ${window.getYYYYMMDD(r.period.boundaryEnd)}`,
+                    s.name,s.hourlyRate,s.baseSalary||'',s.missedChecklistCount,s.deductionNoCheck,s.notDoneCount,(s.lostMinutes/60).toFixed(2),s.deductionWork,
+                    s.pendingPotential,s.pendingCount,s.totalDeduction,net,s.pendingCount?'BELUM FINAL':(r.period.boundaryEnd<=new Date()?'FINAL':'SEMENTARA')
+                ].map(esc).join(',')+'\n';
+            });
+            csv+='\nDETAIL POTONGAN / VALIDASI\nTanggal,Nama Musyrif,Waktu,Tugas,Status,Durasi Jam,Denda Tidak Ceklis,Potongan Tidak Dikerjakan,Total Potongan,Potensi Ditahan,Alasan\n';
+            r.summaries.forEach(s=>s.details.forEach(d=>{
+                const reason=d.reason?`${d.reason.reason||''}${d.reason.detail?' - '+d.reason.detail:''}`:'';
+                csv += [d.dateKey,s.name,`${d.start}-${d.end}`,d.taskTitle,d.status,(window.getTaskDurationMinutes({start:d.start,end:d.end})/60).toFixed(2),d.noCheckDeduction||0,d.workDeduction||0,d.deduction,d.pendingPotential,reason].map(esc).join(',')+'\n';
+            }));
+            const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`Payroll_ISYRAF_${r.period.monthValue}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            await window.logActivity('payroll','Mengunduh laporan payroll.',{period:r.period.monthValue});
+        };
+
+        window.musyrifPayrollLastReport = null;
+        window.musyrifPayrollLoading = false;
+
+        window.buildMyPayrollReport = async function() {
+            if (!localDevUid) return null;
+            await window.ensurePayrollConfig();
+            const period = window.getPayrollPeriod('');
+            const today = new Date(); today.setHours(23,59,59,999);
+            const through = period.end < today ? period.end : today;
+            const name = localStorage.getItem('isyrafUserName') || 'Musyrif';
+            const cfg = window.getPayrollUserConfig(localDevUid, name);
+            const sum = {
+                uid:localDevUid,name,hourlyRate:cfg.hourlyRate,baseSalary:cfg.baseSalary,
+                deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
+                missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,details:[]
+            };
+            let cursor = new Date(period.start);
+            while (cursor <= through) {
+                const dateObj = new Date(cursor); dateObj.setHours(12,0,0,0);
+                const dateKey = window.getYYYYMMDD(dateObj);
+                const [prayers,stateSnap,overrideData] = await Promise.all([
+                    window.getPrayerTimesForPayrollDate(dateKey),
+                    getDoc(doc(db,'artifacts',appId,'public','data','states_'+dateKey,localDevUid)),
+                    window.getPayrollOverrideForDate(dateKey)
+                ]);
+                const st = stateSnap.exists() ? (stateSnap.data()||{}) : {};
+                const sched = generateSchedule(prayers,dateObj.getDay());
+                for (const task of sched) {
+                    if (task.noCheck || (task.noCheckOn&&task.noCheckOn.includes(dateObj.getDay()))) continue;
+                    if (window.isUserOffForPayrollTask(localDevUid,task,dateObj,name,overrideData)) continue;
+                    const checked = !!(st.checklist&&st.checklist[task.id]);
+                    if (checked) continue;
+                    if (dateKey === window.getYYYYMMDD()) {
+                        const nowForTask = new Date();
+                        const endForTask = parseTime(task.end, nowForTask);
+                        if (nowForTask < endForTask) continue;
+                    }
+                    sum.missedChecklistCount++;
+                    const reason = st.missedReasons&&(st.missedReasons[task.id]||st.missedReasons[String(task.id)]);
+                    const ev = window.getPayrollTaskEvaluation({uid:localDevUid,name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true});
+                    if (ev.status === 'Tidak Dikerjakan') {
+                        sum.deductionNoCheck += ev.noCheckDeduction;
+                        sum.deductionWork += ev.workDeduction;
+                        sum.totalDeduction += ev.deduction;
+                        sum.lostMinutes += ev.lostMinutes;
+                        sum.noCheckPenaltyCount++;
+                        sum.notDoneCount++;
+                    } else if (ev.status === 'Tidak Ceklis — Tugas Dikerjakan') {
+                        sum.deductionNoCheck += ev.noCheckDeduction;
+                        sum.totalDeduction += ev.deduction;
+                        sum.noCheckPenaltyCount++;
+                        sum.workedWithoutCheckCount++;
+                    } else if (ev.status === 'Uzur Valid') {
+                        sum.validCount++;
+                    } else if (ev.status === 'Menunggu Validasi Pimpinan') {
+                        sum.pendingPotential += ev.pendingPotential;
+                        sum.pendingCount++;
+                    }
+                    sum.details.push({dateKey,taskTitle:task.title,start:task.start,end:task.end,status:ev.status,deduction:ev.deduction,pendingPotential:ev.pendingPotential,reason});
+                }
+                cursor.setDate(cursor.getDate()+1);
+            }
+            return { period, through, summary:sum, generatedAt:new Date() };
+        };
+
+        window.renderMyPayrollReport = function(report) {
+            if (!report) return;
+            window.musyrifPayrollLastReport = report;
+            const p = report.period, s = report.summary;
+            const periodEl = document.getElementById('musyrifPayrollPeriod');
+            if (periodEl) periodEl.textContent = `Periode ${window.getYYYYMMDD(p.start)} → ${window.getYYYYMMDD(p.boundaryEnd)} • data s.d. ${window.getYYYYMMDD(report.through)}`;
+            const box = document.getElementById('musyrifPayrollSummary');
+            if (!box) return;
+            box.innerHTML = `
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div class="bg-slate-50 border border-slate-100 rounded-xl p-3"><div class="text-[8px] font-black text-slate-500 uppercase">Tidak Ceklis</div><div class="text-lg font-black text-blue-950 mt-1">${s.missedChecklistCount}</div><div class="text-[8px] font-bold text-slate-400">tugas</div></div>
+                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3"><div class="text-[8px] font-black text-amber-600 uppercase">Denda Tidak Ceklis</div><div class="text-[13px] font-black text-amber-800 mt-1">${window.formatRupiah(s.deductionNoCheck)}</div></div>
+                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-lg font-black text-rose-800 mt-1">${s.notDoneCount}</div><div class="text-[8px] font-bold text-rose-500">${(s.lostMinutes/60).toFixed(2)} jam</div></div>
+                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3"><div class="text-[8px] font-black text-rose-600 uppercase">Potongan Tugas</div><div class="text-[13px] font-black text-rose-800 mt-1">${window.formatRupiah(s.deductionWork)}</div></div>
+                    <div class="bg-violet-50 border border-violet-100 rounded-xl p-3"><div class="text-[8px] font-black text-violet-600 uppercase">Menunggu Validasi</div><div class="text-lg font-black text-violet-800 mt-1">${s.pendingCount}</div><div class="text-[8px] font-bold text-violet-500">Potensi maks. ${window.formatRupiah(s.pendingPotential)}</div></div>
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3"><div class="text-[8px] font-black text-emerald-600 uppercase">Total Potongan Final</div><div class="text-[15px] font-black text-emerald-800 mt-1">${window.formatRupiah(s.totalDeduction)}</div></div>
+                </div>
+                <div class="mt-3 text-[9px] font-bold text-slate-500 bg-white/70 border border-slate-100 rounded-xl px-3 py-2.5">${s.workedWithoutCheckCount} tugas dikerjakan tanpa ceklis • ${s.notDoneCount} tugas tidak dikerjakan • ${s.validCount} uzur valid • ${s.pendingCount} menunggu keputusan Pimpinan.</div>`;
+        };
+
+        window.loadMyPayrollDashboard = async function(force=false) {
+            if (currentRole !== 'musyrif' || !localDevUid) return;
+            if (window.musyrifPayrollLoading) return;
+            const p = window.getPayrollPeriod('');
+            if (!force && window.musyrifPayrollLastReport?.period?.monthValue === p.monthValue) {
+                window.renderMyPayrollReport(window.musyrifPayrollLastReport);
+                return;
+            }
+            const box = document.getElementById('musyrifPayrollSummary');
+            if (box) box.innerHTML = '<div class="text-center text-[10px] font-bold text-slate-400 py-4"><i class="fas fa-circle-notch fa-spin mr-1.5"></i> Menghitung rekap periode berjalan...</div>';
+            window.musyrifPayrollLoading = true;
+            try {
+                const report = await window.buildMyPayrollReport();
+                window.renderMyPayrollReport(report);
+            } catch(e) {
+                console.error('My payroll report:',e);
+                if (box) box.innerHTML = '<div class="text-center text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl py-4">Gagal memuat rekap potongan. Coba tekan Hitung Ulang.</div>';
+            } finally {
+                window.musyrifPayrollLoading = false;
+            }
+        };
+
+        window.normalizeMusyrifName = function(name) {
+            return String(name || '').toLowerCase().replace(/\b(ustadz|ust\.?|ust|u\.)\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+        };
+
+        window.getWorkWeekNumber = function(dateObj = new Date()) {
+            return Math.min(5, Math.floor((dateObj.getDate() - 1) / 7) + 1);
+        };
+
+        window.timeToMinutes = function(time) {
+            if (!time) return 0;
+            const [h,m] = String(time).split(':').map(Number);
+            return (h || 0) * 60 + (m || 0);
+        };
+
+        window.getKnownMusyrifName = function(uid, fallbackName = '') {
+            const found = (window.adminAllMusyrifs || []).find(m => m.id === uid);
+            if (found?.name) return found.name;
+            if (uid === localDevUid) return localStorage.getItem('isyrafUserName') || fallbackName || 'Musyrif';
+            return fallbackName || 'Musyrif';
+        };
+
+        window.getDefaultWorkSchedulePattern = function() {
+            const all = window.adminAllMusyrifs || [];
+            const idsFor = names => all.filter(m => names.some(n => window.normalizeMusyrifName(n) === window.normalizeMusyrifName(m.name))).map(m => m.id);
+            return {
+                week13OffUids: idsFor(window.defaultWorkScheduleNames.week13),
+                week13OffNames: [...window.defaultWorkScheduleNames.week13],
+                week24OffUids: idsFor(window.defaultWorkScheduleNames.week24),
+                week24OffNames: [...window.defaultWorkScheduleNames.week24],
+                week5MorningOffUids: idsFor(window.defaultWorkScheduleNames.week5Morning),
+                week5MorningOffNames: [...window.defaultWorkScheduleNames.week5Morning],
+                week5EveningOffUids: idsFor(window.defaultWorkScheduleNames.week5Evening),
+                week5EveningOffNames: [...window.defaultWorkScheduleNames.week5Evening]
+            };
+        };
+
+        window.getEffectiveWorkSchedulePattern = function() {
+            return window.workScheduleTemplate || window.getDefaultWorkSchedulePattern();
+        };
+
+        window.isMusyrifInScheduleGroup = function(uid, name, uidKey, nameKey) {
+            const pattern = window.getEffectiveWorkSchedulePattern();
+            if ((pattern[uidKey] || []).includes(uid)) return true;
+            const normalized = window.normalizeMusyrifName(name || window.getKnownMusyrifName(uid));
+            return (pattern[nameKey] || []).some(n => window.normalizeMusyrifName(n) === normalized);
+        };
+
+        window.getWorkScheduleOverrideMode = function(uid, dateObj = new Date()) {
+            const dateKey = window.getYYYYMMDD(dateObj);
+            const ov = window.workScheduleTodayOverride;
+            if (!ov || ov.dateKey !== dateKey || !ov.entries || !ov.entries[uid]) return null;
+            const mode = ov.entries[uid].mode;
+            return mode && mode !== 'follow' ? mode : null;
+        };
+
+        window.getWorkScheduleOffIntervals = function(uid, dateObj = new Date(), fallbackName = '') {
+            const day = dateObj.getDay();
+            const week = window.getWorkWeekNumber(dateObj);
+            const name = fallbackName || window.getKnownMusyrifName(uid);
+            const overrideMode = window.getWorkScheduleOverrideMode(uid, dateObj);
+            let intervals = [];
+            let source = 'template';
+
+            const regularOff = () => {
+                if (day === 6) return [{start:1020,end:1440,label:'Sabtu 17.00–24.00'}];
+                if (day === 0) return [{start:0,end:1020,label:'Ahad 00.00–17.00'}];
+                return [{start:0,end:1440,label:'Libur penuh hari ini'}];
+            };
+
+            if (overrideMode) {
+                source = 'override';
+                if (overrideMode === 'duty') intervals = [];
+                else if (overrideMode === 'off_full') intervals = [{start:0,end:1440,label:'Libur penuh hari ini'}];
+                else if (overrideMode === 'off_regular') intervals = regularOff();
+                else if (overrideMode === 'off_morning') intervals = [{start:230,end:760,label:'03.50–12.40'}];
+                else if (overrideMode === 'off_evening') intervals = [{start:900,end:1320,label:'15.00–22.00'}];
+                return { intervals, source, week, overrideMode };
+            }
+
+            if (week <= 4) {
+                const isOff = (week === 1 || week === 3)
+                    ? window.isMusyrifInScheduleGroup(uid, name, 'week13OffUids', 'week13OffNames')
+                    : window.isMusyrifInScheduleGroup(uid, name, 'week24OffUids', 'week24OffNames');
+                if (isOff && (day === 6 || day === 0)) intervals = regularOff();
+            } else if (week === 5 && day === 0) {
+                if (window.isMusyrifInScheduleGroup(uid, name, 'week5MorningOffUids', 'week5MorningOffNames')) intervals.push({start:230,end:760,label:'03.50–12.40'});
+                if (window.isMusyrifInScheduleGroup(uid, name, 'week5EveningOffUids', 'week5EveningOffNames')) intervals.push({start:900,end:1320,label:'15.00–22.00'});
+            }
+            return { intervals, source, week, overrideMode:null };
+        };
+
+        window.isUserOffForTask = function(uid, task, dateObj = new Date(), fallbackName = '') {
+            if (!uid || !task?.start) return false;
+            const start = window.timeToMinutes(task.start);
+            return window.getWorkScheduleOffIntervals(uid, dateObj, fallbackName).intervals.some(x => start >= x.start && start < x.end);
+        };
+
+        window.getWorkScheduleDisplay = function(uid, dateObj = new Date(), fallbackName = '') {
+            const info = window.getWorkScheduleOffIntervals(uid, dateObj, fallbackName);
+            const nowMins = dateObj.getHours() * 60 + dateObj.getMinutes();
+            const offNow = info.intervals.some(x => nowMins >= x.start && nowMins < x.end);
+            let scheduleText = 'Piket penuh';
+            if (info.intervals.length) scheduleText = 'Libur ' + info.intervals.map(x => x.label).join(' & ');
+            return { ...info, offNow, scheduleText };
+        };
+
+        window.renderMusyrifWorkSchedule = function(now = new Date()) {
+            const box = document.getElementById('musyrifWorkScheduleStatus');
+            const badge = document.getElementById('musyrifWorkWeekBadge');
+            if (!box || !localDevUid) return;
+            const name = localStorage.getItem('isyrafUserName') || 'Musyrif';
+            const info = window.getWorkScheduleDisplay(localDevUid, now, name);
+            if (badge) badge.textContent = `PEKAN ${info.week}`;
+            const sourceBadge = info.source === 'override' ? '<span class="ml-2 text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-0.5 rounded-md">OVERRIDE</span>' : '';
+            if (info.offNow) {
+                box.className = 'mt-4 text-[11px] font-bold text-cyan-900 bg-cyan-50 border border-cyan-200 rounded-xl px-3 py-3';
+                box.innerHTML = `<div class="flex items-center"><i class="fas fa-umbrella-beach mr-2 text-cyan-600"></i><span class="font-black">SEDANG LIBUR</span>${sourceBadge}</div><div class="mt-1 text-[10px] text-cyan-800">${window.escapeHtml(info.scheduleText)}</div>`;
+            } else {
+                box.className = 'mt-4 text-[11px] font-bold text-emerald-900 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-3';
+                box.innerHTML = `<div class="flex items-center"><i class="fas fa-user-check mr-2 text-emerald-600"></i><span class="font-black">SEDANG PIKET</span>${sourceBadge}</div><div class="mt-1 text-[10px] text-emerald-800">${window.escapeHtml(info.scheduleText)}</div>`;
+            }
+        };
+
+        window.syncWorkSchedulePattern = function() {
+            if (workSchedulePatternUnsubscribe) workSchedulePatternUnsubscribe();
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'work_schedule_pattern');
+            workSchedulePatternUnsubscribe = onSnapshot(ref, snap => {
+                window.workScheduleTemplateExists = snap.exists();
+                window.workScheduleTemplate = snap.exists() ? snap.data() : null;
+                window.renderWorkScheduleAdminForm();
+                window.renderMusyrifWorkSchedule(new Date());
+                window.forceRender = true;
+            }, e => console.warn('Jadwal pola tidak dapat dibaca:', e));
+        };
+
+        window.ensureWorkScheduleOverrideListener = function() {
+            const todayKey = window.getYYYYMMDD();
+            if (window.workScheduleOverrideDateKey === todayKey && workScheduleOverrideUnsubscribe) return;
+            if (workScheduleOverrideUnsubscribe) workScheduleOverrideUnsubscribe();
+            window.workScheduleOverrideDateKey = todayKey;
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'work_schedule_overrides', todayKey);
+            workScheduleOverrideUnsubscribe = onSnapshot(ref, snap => {
+                window.workScheduleTodayOverride = snap.exists() ? snap.data() : null;
+                window.renderWorkScheduleAdminForm();
+                window.renderMusyrifWorkSchedule(new Date());
+                window.forceRender = true;
+            }, e => console.warn('Override jadwal tidak dapat dibaca:', e));
+        };
+
+        window.ensureDefaultWorkScheduleTemplate = async function() {
+            if (currentRole !== 'admin') return;
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'work_schedule_pattern');
+            try {
+                const snap = await getDoc(ref);
+                if (snap.exists()) return;
+                const pattern = window.getDefaultWorkSchedulePattern();
+                await setDoc(ref, { ...pattern, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), version: 1 });
+                await window.logActivity('schedule', 'Membuat template awal jadwal libur musyrif.', { automaticSeed:true });
+            } catch(e) { console.warn('Seed jadwal libur:', e); }
+        };
+
+        window.renderScheduleCheckboxes = function(targetId, uidKey, nameKey) {
+            const box = document.getElementById(targetId);
+            if (!box) return;
+            const all = [...(window.adminAllMusyrifs || [])].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'id'));
+            if (!all.length) { box.innerHTML='<div class="text-[10px] text-slate-400 font-bold">Belum ada akun musyrif.</div>'; return; }
+            box.innerHTML = all.map(m => {
+                const checked = window.isMusyrifInScheduleGroup(m.id, m.name, uidKey, nameKey) ? 'checked' : '';
+                return `<label class="flex items-start gap-2 p-2 rounded-lg hover:bg-white cursor-pointer"><input ${checked} type="checkbox" data-schedule-group="${uidKey}" value="${window.escapeHtml(m.id)}" data-name="${window.escapeHtml(m.name||'Musyrif')}" class="mt-0.5 w-4 h-4 rounded text-cyan-600 border-slate-300"><span class="text-[10px] font-bold text-slate-700 break-words">${window.escapeHtml(m.name||'Musyrif')}</span></label>`;
+            }).join('');
+        };
+
+        window.renderWorkScheduleTodaySummary = function() {
+            const box = document.getElementById('adminWorkScheduleToday');
+            const badge = document.getElementById('adminWorkWeekBadge');
+            if (!box) return;
+            const now = new Date();
+            const week = window.getWorkWeekNumber(now);
+            if (badge) badge.textContent = `PEKAN ${week}`;
+            const all = [...(window.adminAllMusyrifs || [])].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'id'));
+            if (!all.length) { box.innerHTML='<div class="text-[10px] font-bold text-slate-400">Belum ada akun musyrif.</div>'; return; }
+            const dayText = now.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+            box.innerHTML = `<div class="flex items-center justify-between gap-2 mb-3"><div><div class="text-[10px] font-black text-blue-950 uppercase tracking-wider"><i class="fas fa-calendar-check mr-1.5 text-emerald-500"></i> Jadwal Aktif Hari Ini</div><div class="text-[9px] font-bold text-slate-400 mt-0.5">${window.escapeHtml(dayText)} • Pekan ${week}</div></div></div>` + all.map(m => {
+                const info = window.getWorkScheduleDisplay(m.id, now, m.name);
+                const currentCls = info.offNow ? 'bg-cyan-50 text-cyan-800 border-cyan-100' : 'bg-emerald-50 text-emerald-800 border-emerald-100';
+                const currentText = info.offNow ? 'LIBUR SEKARANG' : 'PIKET SEKARANG';
+                const source = info.source === 'override' ? '<span class="text-[8px] font-black text-violet-600"> • override</span>' : '';
+                return `<div class="work-schedule-person-row flex items-start justify-between gap-3 py-2 border-b border-slate-100"><div class="min-w-0"><div class="text-[10px] font-black text-slate-700 break-words">${window.escapeHtml(m.name||'Musyrif')}</div><div class="text-[9px] font-semibold text-slate-500 mt-0.5">${window.escapeHtml(info.scheduleText)}${source}</div></div><span class="shrink-0 text-[8px] font-black px-2 py-1 rounded-lg border ${currentCls}">${currentText}</span></div>`;
+            }).join('');
+        };
+
+        window.renderWorkScheduleAdminForm = function() {
+            if (currentRole !== 'admin') return;
+            window.renderScheduleCheckboxes('workScheduleWeek13','week13OffUids','week13OffNames');
+            window.renderScheduleCheckboxes('workScheduleWeek24','week24OffUids','week24OffNames');
+            window.renderScheduleCheckboxes('workScheduleWeek5Morning','week5MorningOffUids','week5MorningOffNames');
+            window.renderScheduleCheckboxes('workScheduleWeek5Evening','week5EveningOffUids','week5EveningOffNames');
+            window.renderWorkScheduleTodaySummary();
+
+            const rows = document.getElementById('workScheduleOverrideRows');
+            const badge = document.getElementById('workScheduleOverrideBadge');
+            const note = document.getElementById('workScheduleOverrideNote');
+            const all = [...(window.adminAllMusyrifs || [])].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'id'));
+            const entries = window.workScheduleTodayOverride?.entries || {};
+            if (badge) badge.classList.toggle('hidden', !window.workScheduleTodayOverride);
+            if (note && document.activeElement !== note) note.value = window.workScheduleTodayOverride?.note || '';
+            if (rows) rows.innerHTML = all.length ? all.map(m => {
+                const mode = entries[m.id]?.mode || 'follow';
+                return `<div class="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-2 items-center bg-slate-50 border border-slate-100 rounded-xl p-2.5"><div class="text-[10px] font-black text-slate-700 break-words">${window.escapeHtml(m.name||'Musyrif')}</div><select data-work-override-uid="${window.escapeHtml(m.id)}" data-name="${window.escapeHtml(m.name||'Musyrif')}" class="text-[10px] font-bold bg-white border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-violet-300"><option value="follow" ${mode==='follow'?'selected':''}>Ikuti template</option><option value="duty" ${mode==='duty'?'selected':''}>Piket penuh hari ini</option><option value="off_regular" ${mode==='off_regular'?'selected':''}>Libur jam reguler</option><option value="off_full" ${mode==='off_full'?'selected':''}>Libur penuh hari ini</option><option value="off_morning" ${mode==='off_morning'?'selected':''}>Libur 03.50–12.40</option><option value="off_evening" ${mode==='off_evening'?'selected':''}>Libur 15.00–22.00</option></select></div>`;
+            }).join('') : '<div class="text-[10px] text-slate-400 font-bold">Belum ada akun musyrif.</div>';
+        };
+
+        window.collectScheduleGroup = function(uidKey) {
+            const checked = [...document.querySelectorAll(`input[data-schedule-group="${uidKey}"]:checked`)];
+            return { uids: checked.map(x=>x.value), names: checked.map(x=>x.dataset.name || 'Musyrif') };
+        };
+
+        window.saveWorkScheduleTemplate = async function() {
+            if (currentRole !== 'admin') return showToast('Hanya Pimpinan yang dapat mengubah jadwal.', 'error');
+            const btn = document.getElementById('btnSaveWorkScheduleTemplate');
+            const old = btn?.innerHTML;
+            if (btn) { btn.disabled=true; btn.innerHTML='<i class="fas fa-circle-notch fa-spin mr-2"></i> Menyimpan...'; }
+            try {
+                const a=window.collectScheduleGroup('week13OffUids'), b=window.collectScheduleGroup('week24OffUids'), c=window.collectScheduleGroup('week5MorningOffUids'), d=window.collectScheduleGroup('week5EveningOffUids');
+                const payload={week13OffUids:a.uids,week13OffNames:a.names,week24OffUids:b.uids,week24OffNames:b.names,week5MorningOffUids:c.uids,week5MorningOffNames:c.names,week5EveningOffUids:d.uids,week5EveningOffNames:d.names,updatedAt:serverTimestamp(),version:1};
+                await setDoc(doc(db,'artifacts',appId,'public','data','settings','work_schedule_pattern'),payload,{merge:true});
+                await window.logActivity('schedule','Memperbarui template pola jadwal libur musyrif.',{week13:a.names,week24:b.names,week5Morning:c.names,week5Evening:d.names});
+                showToast('Pola jadwal berhasil disimpan.', 'success');
+            } catch(e) { console.error(e); showToast('Gagal menyimpan pola jadwal.', 'error'); }
+            finally { if(btn){btn.disabled=false;btn.innerHTML=old;} }
+        };
+
+        window.saveWorkScheduleOverrideToday = async function() {
+            if (currentRole !== 'admin') return showToast('Hanya Pimpinan yang dapat mengubah jadwal.', 'error');
+            const entries={};
+            document.querySelectorAll('[data-work-override-uid]').forEach(sel=>{ if(sel.value && sel.value!=='follow') entries[sel.dataset.workOverrideUid]={mode:sel.value,name:sel.dataset.name||'Musyrif'}; });
+            const note=(document.getElementById('workScheduleOverrideNote')?.value||'').trim();
+            const dateKey=window.getYYYYMMDD();
+            try {
+                const ref=doc(db,'artifacts',appId,'public','data','work_schedule_overrides',dateKey);
+                if (!Object.keys(entries).length && !note) {
+                    await deleteDoc(ref);
+                    await window.logActivity('schedule','Menghapus override jadwal hari ini dan kembali ke template.',{dateKey});
+                    showToast('Override dihapus. Jadwal kembali mengikuti template.', 'success');
+                } else {
+                    await setDoc(ref,{dateKey,entries,note,updatedAt:serverTimestamp(),updatedBy:localDevUid},{merge:false});
+                    await window.logActivity('schedule','Menyimpan override jadwal musyrif untuk hari ini.',{dateKey,note,entries});
+                    showToast('Override jadwal hari ini berhasil disimpan.', 'success');
+                }
+            } catch(e){console.error(e);showToast('Gagal menyimpan override jadwal.', 'error');}
+        };
+
+        window.clearWorkScheduleOverrideToday = async function() {
+            if (currentRole !== 'admin') return showToast('Hanya Pimpinan yang dapat mengubah jadwal.', 'error');
+            const dateKey=window.getYYYYMMDD();
+            try {
+                await deleteDoc(doc(db,'artifacts',appId,'public','data','work_schedule_overrides',dateKey));
+                await window.logActivity('schedule','Mengembalikan jadwal hari ini ke template otomatis.',{dateKey});
+                showToast('Jadwal hari ini kembali mengikuti template.', 'success');
+            } catch(e){console.error(e);showToast('Gagal menghapus override.', 'error');}
         };
 
         document.addEventListener('visibilitychange', () => {
@@ -1726,6 +2813,9 @@
                               </div>`;
                 });
                 containerMusyrifs.innerHTML = htmlM || '<div class="text-[11px] text-slate-500">Belum ada musyrif</div>';
+                await window.ensureDefaultWorkScheduleTemplate();
+                window.renderWorkScheduleAdminForm();
+                if (window.ensurePayrollConfig) { await window.ensurePayrollConfig(); window.renderPayrollConfigUI(); }
 
                 // Fetch Rooms
                 const qRooms = query(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'));
@@ -1737,6 +2827,9 @@
                     htmlR += `<option value="${doc.id}">${doc.data().name}</option>`;
                 });
                 selectRoom.innerHTML = htmlR;
+                
+                window.forceRender = true;
+                updateAppLoop();
             } catch(e) {
                 console.error("Error load admin manager:", e);
                 containerMusyrifs.innerHTML = '<div class="text-[11px] text-rose-500">Gagal memuat.</div>';
@@ -1978,6 +3071,7 @@
                     if (data.missedReasons) {
                         window.missedReasons = data.missedReasons;
                         localStorage.setItem('isyrafMissedReasons', JSON.stringify(window.missedReasons));
+                        window.musyrifPayrollLastReport = null;
                     }
                     if (Array.isArray(data.incidentNotes)) {
                         window.incidentNotes = data.incidentNotes;
@@ -2296,12 +3390,16 @@
         const initApp = async () => {
             await loadDynamicSchedule();
             syncCustomChecklist();
+            window.syncWorkSchedulePattern();
+            window.ensureWorkScheduleOverrideListener();
             updateAppLoop();
             
             let target = 'screen-login';
             if(currentRole === 'musyrif') {
                 target = 'screen-musyrif';
                 document.getElementById('musyrifNameDisplay').innerText = localStorage.getItem('isyrafUserName') || 'Musyrif';
+                window.musyrifPayrollLastReport = null;
+                setTimeout(() => { if (window.loadMyPayrollDashboard) window.loadMyPayrollDashboard(false); }, 1600);
             } else if(currentRole === 'admin') {
                 target = 'screen-admin';
                 document.getElementById('adminDateSelector').value = window.adminSelectedDate;
@@ -2309,6 +3407,8 @@
                 window.setupAuditDashboard();
                 setTimeout(() => window.loadChartData(7), 800); 
                 window.loadAdminSantriManager();
+                window.ensurePayrollConfig();
+                window.setDefaultPayrollPeriod();
             }
             
             triggerLoading(target);
@@ -2325,6 +3425,9 @@
             if (customChecklistUnsubscribe) { customChecklistUnsubscribe(); customChecklistUnsubscribe = null; }
             if (auditRecentUnsubscribe) { auditRecentUnsubscribe(); auditRecentUnsubscribe = null; }
             if (presenceAdminUnsubscribe) { presenceAdminUnsubscribe(); presenceAdminUnsubscribe = null; }
+            if (workSchedulePatternUnsubscribe) { workSchedulePatternUnsubscribe(); workSchedulePatternUnsubscribe = null; }
+            if (workScheduleOverrideUnsubscribe) { workScheduleOverrideUnsubscribe(); workScheduleOverrideUnsubscribe = null; }
+            window.workScheduleOverrideDateKey = null;
 
             try {
                 await window.logActivity('logout', 'Logout dari aplikasi.');
@@ -2445,6 +3548,7 @@
             document.getElementById('tab-absensi').className = tab === 'absensi' ? act : inact;
             document.getElementById('tab-pedoman').className = tab === 'pedoman' ? act : inact;
             if (tab === 'pedoman') window.initPedomanDay();
+            if (tab === 'dashboard' && currentRole === 'musyrif' && window.loadMyPayrollDashboard) window.loadMyPayrollDashboard(false);
         };
 
         function updateAbsensiReminder(now = new Date()) {
@@ -2521,6 +3625,7 @@
 
         function updateAppLoop() {
             const now = new Date();
+            window.ensureWorkScheduleOverrideListener();
             const timeStr = now.toLocaleTimeString('id-ID', {hour12:false});
             const dateStr = now.toLocaleDateString('id-ID', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
             const currentMinStr = timeStr.substring(0, 5); 
@@ -2531,6 +3636,7 @@
                 if(clock) clock.innerText = timeStr;
                 if(date) date.innerHTML = `${dateStr} <i class="fas fa-satellite-dish ml-1 opacity-70"></i>`;
                 updateAbsensiReminder(now);
+                window.renderMusyrifWorkSchedule(now);
 
                 if (window.forceRender || window.lastRenderTime !== currentMinStr) {
                     if (window.activeEditors.size === 0) {
@@ -2546,6 +3652,7 @@
                 const date = document.getElementById('currentDateAdmin');
                 if(clock) clock.innerText = timeStr;
                 if(date) date.innerText = dateStr;
+                window.renderWorkScheduleTodaySummary();
                 
                 if (window.forceRender || window.lastRenderTime !== currentMinStr) {
                     renderAdminUI(now);
@@ -2571,7 +3678,8 @@
 
             scheduleHariIni.forEach(task => {
                 const isNoCheck = task.noCheck || (task.noCheckOn && task.noCheckOn.includes(day));
-                if (isNoCheck) return;
+                const isScheduleLeave = window.isUserOffForTask(localDevUid, task, now, localStorage.getItem('isyrafUserName') || 'Musyrif');
+                if (isNoCheck || isScheduleLeave) return;
 
                 const startTime = parseTime(task.start, now);
                 const diffMs = startTime - now;
@@ -2615,6 +3723,8 @@
             const now = new Date();
             const scheduleHariIni = generateSchedule(globalPrayers, now.getDay());
             const task = scheduleHariIni.find(t => t.id === taskId);
+            if (!task) return;
+            if (window.isUserOffForTask(localDevUid, task, now, localStorage.getItem('isyrafUserName') || 'Musyrif')) return showToast('Agenda ini masuk jadwal libur Anda dan tidak perlu diceklis.', 'error');
 
             const cp = window.getCheckpointWindow(task.start, task.end);
             const s = parseTime(cp.start, now);
@@ -2665,12 +3775,16 @@
             window.missedReasons[taskId] = {
                 reason,
                 detail,
-                time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+                time: String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0'),
+                validation: null
             };
             localStorage.setItem('isyrafMissedReasons', JSON.stringify(window.missedReasons));
             await saveDataToFirebase();
             const missedTask = generateSchedule(globalPrayers, now.getDay()).find(t => t.id === taskId);
             await window.logActivity('missed_reason', `Memberikan alasan tugas terlewat: ${missedTask?.title || 'Tugas'}.`, { taskId, reason, detail });
+            window.payrollLastReport = null;
+            window.musyrifPayrollLastReport = null;
+            setTimeout(() => { if (window.loadMyPayrollDashboard) window.loadMyPayrollDashboard(true); }, 100);
             window.activeEditors.delete(`reason-${taskId}`);
             window.forceRender = true;
             updateAppLoop();
@@ -3025,7 +4139,8 @@
             let html = '';
 
             scheduleHariIni.forEach(task => {
-                const isNoCheck = task.noCheck || (task.noCheckOn && task.noCheckOn.includes(day));
+                const isScheduleLeave = window.isUserOffForTask(localDevUid, task, now, localStorage.getItem('isyrafUserName') || 'Musyrif');
+                const isNoCheck = task.noCheck || (task.noCheckOn && task.noCheckOn.includes(day)) || isScheduleLeave;
                 const cp = window.getCheckpointWindow(task.start, task.end);
                 const sCheck = parseTime(cp.start, now);
                 const eCheck = parseTime(cp.end, now);
@@ -3040,7 +4155,7 @@
                 const noteText = window.notesState[task.id];
                 const missedReason = window.missedReasons[task.id];
 
-                if (isNow) currentTask = task;
+                if (isNow && !isScheduleLeave) currentTask = task;
                 if (!isNoCheck) {
                     totalValid++;
                     if (isChecked) sel++; else if (isPas) lew++; else bel++;
@@ -3048,7 +4163,13 @@
 
                 let sCls, tCls, iHTML, bHTML, bCls;
 
-                if (isNoCheck) {
+                if (isScheduleLeave) {
+                    sCls = 'glass-card bg-cyan-50/80 border-cyan-200 opacity-85';
+                    tCls = 'text-cyan-800 font-bold';
+                    iHTML = '<i class="fas fa-umbrella-beach text-cyan-400 text-2xl"></i>';
+                    bHTML = '<span class="text-[9px] bg-cyan-100 text-cyan-700 px-2 py-1 rounded-lg ml-2 font-black">LIBUR</span>';
+                    bCls = 'border-l-[5px] border-l-cyan-400';
+                } else if (isNoCheck) {
                     const isSleep = task.id === 0 || task.id === 23;
                     const activeBadge = isSleep ? 'TIDUR' : 'ISTIRAHAT';
                     const inactiveBadge = isSleep ? 'TIDUR' : 'BEBAS';
@@ -3072,11 +4193,32 @@
                     bHTML = '<span class="text-[9px] bg-slate-200 text-slate-600 px-2 py-1 rounded-lg ml-2 font-black">WAIT</span>';
                     bCls = 'border-l-[5px] border-l-slate-200';
                 } else if (isPas) {
-                    sCls = 'glass-card bg-rose-50/80 border-rose-200 opacity-90';
-                    tCls = 'text-rose-800';
-                    iHTML = '<i class="fas fa-times-circle text-rose-500 text-[28px]"></i>';
-                    bHTML = '<span class="text-[9px] bg-rose-200 text-rose-800 px-2 py-1 rounded-lg ml-2 font-black">LEWAT</span>';
-                    bCls = 'border-l-[5px] border-l-rose-500';
+                    const missedDecision = window.getMissedDecision(missedReason);
+                    if (missedDecision === 'valid') {
+                        sCls = 'glass-card bg-emerald-50/80 border-emerald-200 opacity-90';
+                        tCls = 'text-emerald-800';
+                        iHTML = '<i class="fas fa-shield-heart text-emerald-500 text-[28px]"></i>';
+                        bHTML = '<span class="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded-lg ml-2 font-black">UZUR VALID</span>';
+                        bCls = 'border-l-[5px] border-l-emerald-500';
+                    } else if (missedDecision === 'invalid_worked') {
+                        sCls = 'glass-card bg-amber-50/80 border-amber-200 opacity-90';
+                        tCls = 'text-amber-800';
+                        iHTML = '<i class="fas fa-clipboard-question text-amber-500 text-[28px]"></i>';
+                        bHTML = '<span class="text-[9px] bg-amber-100 text-amber-800 px-2 py-1 rounded-lg ml-2 font-black">TIDAK CEKLIS</span>';
+                        bCls = 'border-l-[5px] border-l-amber-500';
+                    } else if (missedReason && !missedDecision) {
+                        sCls = 'glass-card bg-violet-50/80 border-violet-200 opacity-90';
+                        tCls = 'text-violet-800';
+                        iHTML = '<i class="fas fa-hourglass-half text-violet-500 text-[28px]"></i>';
+                        bHTML = '<span class="text-[9px] bg-violet-100 text-violet-800 px-2 py-1 rounded-lg ml-2 font-black">MENUNGGU VALIDASI</span>';
+                        bCls = 'border-l-[5px] border-l-violet-500';
+                    } else {
+                        sCls = 'glass-card bg-rose-50/80 border-rose-200 opacity-90';
+                        tCls = 'text-rose-800';
+                        iHTML = '<i class="fas fa-times-circle text-rose-500 text-[28px]"></i>';
+                        bHTML = '<span class="text-[9px] bg-rose-200 text-rose-800 px-2 py-1 rounded-lg ml-2 font-black">TIDAK DIKERJAKAN</span>';
+                        bCls = 'border-l-[5px] border-l-rose-500';
+                    }
                 } else {
                     sCls = 'bg-white shadow-xl ring-[5px] ring-blue-50 transform scale-[1.02] z-10';
                     tCls = 'text-blue-950 font-black';
@@ -3126,7 +4268,7 @@
                                 <span class="text-[9px] font-black uppercase tracking-wider text-violet-700"><i class="fas fa-circle-info mr-1"></i> Alasan Tugas Tidak Terlaksana</span>
                                 <button onclick="toggleMissedReasonEditor(${task.id})" class="text-[9px] font-black text-violet-700 bg-white border border-violet-200 px-2 py-1 rounded-lg">Edit</button>
                             </div>
-                            <div class="text-[11px] font-extrabold text-violet-900 mt-1">${window.escapeHtml(missedReason.reason)}</div>
+                            <div class="flex items-center gap-2 flex-wrap mt-1"><div class="text-[11px] font-extrabold text-violet-900">${window.escapeHtml(missedReason.reason)}</div>${window.renderMissedValidationStatus(missedReason)}</div>
                             ${missedReason.detail ? `<div class="text-[10px] font-semibold text-slate-600 mt-1">${window.escapeHtml(missedReason.detail)}</div>` : ''}
                             ${missedReason.time ? `<div class="text-[9px] font-bold text-slate-400 mt-1">Dicatat ${window.escapeHtml(missedReason.time)}</div>` : ''}
                         </div>`;
@@ -3166,7 +4308,7 @@
                     </div>
                 </div>`;
 
-                const pencilBtn = (!isFut) ? `<button onclick="toggleNoteEditor(${task.id})" class="text-slate-400 hover:text-amber-500 transition px-2 py-1 rounded-full hover:bg-slate-100" title="Catatan Kejadian"><i class="fas fa-pencil-alt text-[13px]"></i></button>` : '';
+                const pencilBtn = (!isFut && !isScheduleLeave) ? `<button onclick="toggleNoteEditor(${task.id})" class="text-slate-400 hover:text-amber-500 transition px-2 py-1 rounded-full hover:bg-slate-100" title="Catatan Kejadian"><i class="fas fa-pencil-alt text-[13px]"></i></button>` : '';
 
                 const titleLine = task.keterangan 
                     ? `<div class="flex items-center justify-between cursor-pointer group" onclick="toggleKeterangan(${task.id})">
@@ -3192,8 +4334,18 @@
             });
             container.innerHTML = html;
             renderMusyrifExtraCards();
+            window.renderMusyrifWorkSchedule(now);
 
-            if (currentTask) {
+            const todayWorkInfo = window.getWorkScheduleDisplay(localDevUid, now, localStorage.getItem('isyrafUserName') || 'Musyrif');
+            if (todayWorkInfo.offNow) {
+                const cT = document.getElementById('currentActivityTitle');
+                const cD = document.getElementById('currentActivityDesc');
+                const cTi = document.getElementById('currentActivityTime');
+                if(cT) cT.innerText = 'Jadwal Libur Musyrif';
+                if(cD) cD.innerText = todayWorkInfo.scheduleText + (todayWorkInfo.source === 'override' ? ' (Override Pimpinan)' : '');
+                const activeInterval = todayWorkInfo.intervals.find(x => (now.getHours()*60+now.getMinutes()) >= x.start && (now.getHours()*60+now.getMinutes()) < x.end);
+                if(cTi && activeInterval) cTi.innerText = activeInterval.label;
+            } else if (currentTask) {
                 const cT = document.getElementById('currentActivityTitle');
                 const cD = document.getElementById('currentActivityDesc');
                 const cTi = document.getElementById('currentActivityTime');
@@ -3333,7 +4485,15 @@
             let html = '';
             let musyrifStats = [];
 
+            const allMusyrifsToRender = {};
+            (window.adminAllMusyrifs || []).forEach(m => {
+                allMusyrifsToRender[m.id] = { uid: m.id, name: m.name, checklist: {}, notes: {}, missedReasons: {}, incidentNotes: [], handoverRecords: [] };
+            });
             Object.entries(musyrifListState).forEach(([musyrifId, musyrif]) => {
+                allMusyrifsToRender[musyrifId] = { ...(allMusyrifsToRender[musyrifId] || {}), ...musyrif, uid: musyrifId };
+            });
+
+            Object.entries(allMusyrifsToRender).forEach(([musyrifId, musyrif]) => {
                 let sel = 0, ter = 0, bel = 0, totalValid = 0, missedWithoutReason = 0;
                 let totalNotes = musyrif.notes ? Object.keys(musyrif.notes).length : 0;
                 let incidentCount = Array.isArray(musyrif.incidentNotes) ? musyrif.incidentNotes.length : 0;
@@ -3341,6 +4501,7 @@
 
                 scheduleHariIni.forEach(t => {
                     if (t.noCheck || (t.noCheckOn && t.noCheckOn.includes(day))) return;
+                    if (window.isUserOffForTask(musyrifId, t, displayDateObj, musyrif.name || 'Musyrif')) return;
                     totalValid++;
                     const isChecked = musyrif.checklist && musyrif.checklist[t.id];
                     
@@ -3399,6 +4560,8 @@
                 const notesBadge = musyrif.totalNotes > 0 ? `<span class="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-2"><i class="fas fa-comment-dots mr-1"></i>${musyrif.totalNotes} Catatan</span>` : '';
                 const incidentsBadge = musyrif.incidentCount > 0 ? `<span class="bg-orange-100 text-orange-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-1"><i class="fas fa-clipboard-list mr-1"></i>${musyrif.incidentCount} Kejadian</span>` : '';
                 const handoverBadge = musyrif.handoverCount > 0 ? `<span class="bg-indigo-100 text-indigo-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-1"><i class="fas fa-right-left mr-1"></i>${musyrif.handoverCount} Serah Terima</span>` : '';
+                const workInfo = window.getWorkScheduleDisplay(musyrif.uid, displayDateObj, musyrif.name || 'Musyrif');
+                const workBadge = workInfo.intervals.length ? `<span class="bg-cyan-100 text-cyan-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-1"><i class="fas fa-umbrella-beach mr-1"></i>${window.escapeHtml(workInfo.scheduleText)}${workInfo.source === 'override' ? ' • Override' : ''}</span>` : `<span class="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-md ml-1"><i class="fas fa-user-check mr-1"></i>Piket Penuh${workInfo.source === 'override' ? ' • Override' : ''}</span>`;
                 
                 let rankBadge = '';
                 if (index === 0 && musyrif.pct > 0) rankBadge = '<i class="fas fa-trophy text-yellow-400 text-xl ml-2 drop-shadow-sm" title="Peringkat 1"></i>';
@@ -3417,9 +4580,11 @@
                 let detailHtml = '<div class="space-y-1.5 mt-3 max-h-60 overflow-y-auto no-scrollbar pr-1">';
                 scheduleHariIni.forEach(t => {
                     if (t.noCheck || (t.noCheckOn && t.noCheckOn.includes(day))) return;
+                    const isScheduleLeave = window.isUserOffForTask(musyrif.uid, t, displayDateObj, musyrif.name || 'Musyrif');
                     const checkValue = musyrif.checklist && musyrif.checklist[t.id];
                     const isChecked = !!checkValue;
                     const noteText = musyrif.notes && musyrif.notes[t.id];
+                    const missedReason = musyrif.missedReasons && (musyrif.missedReasons[t.id] || musyrif.missedReasons[String(t.id)]);
                     let isPas = true;
                     if(isToday) {
                         const cp = window.getCheckpointWindow(t.start, t.end);
@@ -3428,25 +4593,51 @@
                     
                     let statusHtml = '';
                     let bgCls = '';
-                    if (isChecked) {
+                    if (isScheduleLeave) {
+                        bgCls = 'bg-cyan-50 border-cyan-100';
+                        statusHtml = '<span class="text-[9px] font-black text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded-lg"><i class="fas fa-umbrella-beach mr-1"></i> LIBUR</span>';
+                    } else if (isChecked) {
                         bgCls = 'bg-emerald-50 border-emerald-100';
                         const timeBadge = typeof checkValue === 'string' ? ` <span class="opacity-80 ml-1.5"><i class="far fa-clock"></i> ${checkValue}</span>` : '';
                         statusHtml = `<span class="text-[9px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-lg flex items-center"><i class="fas fa-check mr-1"></i> OK${timeBadge}</span>`;
                     } else if (isPas) {
-                        bgCls = 'bg-rose-50 border-rose-100';
-                        statusHtml = '<span class="text-[9px] font-black text-rose-600 bg-rose-100 px-2 py-0.5 rounded-lg"><i class="fas fa-times"></i> SKIP</span>';
+                        const d = window.getMissedDecision(missedReason);
+                        if (d === 'valid') {
+                            bgCls = 'bg-emerald-50 border-emerald-100';
+                            statusHtml = '<span class="text-[9px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">UZUR VALID</span>';
+                        } else if (d === 'invalid_worked') {
+                            bgCls = 'bg-amber-50 border-amber-100';
+                            statusHtml = '<span class="text-[9px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg">TIDAK CEKLIS • DIKERJAKAN</span>';
+                        } else if (missedReason && !d) {
+                            bgCls = 'bg-violet-50 border-violet-100';
+                            statusHtml = '<span class="text-[9px] font-black text-violet-700 bg-violet-100 px-2 py-0.5 rounded-lg">MENUNGGU VALIDASI</span>';
+                        } else {
+                            bgCls = 'bg-rose-50 border-rose-100';
+                            statusHtml = '<span class="text-[9px] font-black text-rose-600 bg-rose-100 px-2 py-0.5 rounded-lg">TIDAK DIKERJAKAN</span>';
+                        }
                     } else {
                         bgCls = 'bg-slate-50 border-slate-100';
                         statusHtml = '<span class="text-[9px] font-black text-slate-500 bg-slate-200 px-2 py-0.5 rounded-lg"><i class="fas fa-clock"></i> WAIT</span>';
                     }
 
                     let reasonHtml = '';
-                    const missedReason = musyrif.missedReasons && musyrif.missedReasons[t.id];
-                    if (!isChecked && isPas) {
+                    if (!isScheduleLeave && !isChecked && isPas) {
+                        const payrollEval = window.getPayrollTaskEvaluation({ uid:musyrif.uid, name:musyrif.name, task:t, missedReason, isChecked:false, isLeave:false, ended:true });
                         if (missedReason) {
-                            reasonHtml = `<div class="mt-2 text-[9px] font-semibold text-violet-800 bg-violet-50 p-2 rounded-lg border border-violet-200/60"><i class="fas fa-circle-info mr-1 text-violet-500"></i><b>${window.escapeHtml(missedReason.reason)}</b>${missedReason.detail ? ` — ${window.escapeHtml(missedReason.detail)}` : ''}</div>`;
+                            const decision = window.getMissedDecision(missedReason);
+                            const statusTone = decision === 'valid' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : decision === 'invalid_not_done' ? 'text-rose-700 bg-rose-50 border-rose-200' : decision === 'invalid_worked' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-violet-800 bg-violet-50 border-violet-200';
+                            const amountText = decision === 'valid' ? 'Potongan Rp0' : decision === 'invalid_worked' ? `Denda tidak ceklis ${window.formatRupiah(payrollEval.deduction)}` : decision === 'invalid_not_done' ? `Total potongan ${window.formatRupiah(payrollEval.deduction)} (tidak ceklis + tidak melakukan tugas)` : `Potongan ditahan • potensi maksimum ${window.formatRupiah(payrollEval.pendingPotential)}`;
+                            reasonHtml = `<div class="mt-2 text-[9px] font-semibold p-2.5 rounded-xl border ${statusTone}">
+                                <div class="flex items-center justify-between gap-2 flex-wrap"><div><i class="fas fa-circle-info mr-1"></i><b>${window.escapeHtml(missedReason.reason)}</b>${missedReason.detail ? ` — ${window.escapeHtml(missedReason.detail)}` : ''}</div>${window.renderMissedValidationStatus(missedReason)}</div>
+                                <div class="mt-1.5 font-black">${window.escapeHtml(payrollEval.status)} • ${amountText}</div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 mt-2">
+                                    <button onclick="validateMissedTask('${musyrif.uid}',${t.id},'valid','${window.adminSelectedDate}')" class="text-[8px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1.5 rounded-lg">Valid</button>
+                                    <button onclick="validateMissedTask('${musyrif.uid}',${t.id},'invalid_worked','${window.adminSelectedDate}')" class="text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg">Invalid • Dikerjakan</button>
+                                    <button onclick="validateMissedTask('${musyrif.uid}',${t.id},'invalid_not_done','${window.adminSelectedDate}')" class="text-[8px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-2 py-1.5 rounded-lg">Invalid • Tidak Dikerjakan</button>
+                                </div>
+                            </div>`;
                         } else {
-                            reasonHtml = `<div class="mt-2 text-[9px] font-black text-rose-700 bg-rose-100 p-2 rounded-lg border border-rose-200/60"><i class="fas fa-triangle-exclamation mr-1"></i> ALASAN BELUM DIISI</div>`;
+                            reasonHtml = `<div class="mt-2 text-[9px] font-black text-rose-700 bg-rose-100 p-2 rounded-lg border border-rose-200/60"><i class="fas fa-triangle-exclamation mr-1"></i> TIDAK DIKERJAKAN • Denda tidak ceklis ${window.formatRupiah(payrollEval.noCheckDeduction)} + potongan tugas ${window.formatRupiah(payrollEval.workDeduction)} = <b>${window.formatRupiah(payrollEval.deduction)}</b> <span class="font-semibold">(${(payrollEval.durationMinutes/60).toFixed(2)} jam × ${window.formatRupiah(window.getPayrollUserConfig(musyrif.uid,musyrif.name).hourlyRate)}/jam)</span></div>`;
                         }
                     }
 
@@ -3479,7 +4670,7 @@
                         <div class="flex justify-between items-start mb-4 relative z-10">
                             <div class="flex items-center">
                                 <div>
-                                    <h3 class="font-extrabold text-blue-950 text-[16px] flex items-center flex-wrap">${musyrif.name || 'Musyrif'} ${rankBadge} ${notesBadge} ${incidentsBadge} ${handoverBadge}</h3>
+                                    <h3 class="font-extrabold text-blue-950 text-[16px] flex items-center flex-wrap">${musyrif.name || 'Musyrif'} ${rankBadge} ${notesBadge} ${incidentsBadge} ${handoverBadge} ${workBadge}</h3>
                                     <p class="text-[11px] font-bold text-slate-500 mt-1 uppercase"><i class="fas fa-map-marker-alt mr-1 text-amber-500"></i> ${musyrif.roomName}</p>
                                 </div>
                             </div>
@@ -3504,7 +4695,7 @@
                         </div>
                     </div>`;
             });
-            container.innerHTML = html || '<p class="text-center text-slate-400 font-bold py-10">Menunggu data Musyrif aktif...</p>';
+            container.innerHTML = html || '<p class="text-center text-slate-400 font-bold py-10">Belum ada akun Musyrif terdaftar.</p>';
         }
 
         window.toggleDetailAdmin = function(uid) {
