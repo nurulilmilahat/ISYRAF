@@ -2006,7 +2006,7 @@
                 summaries[m.id]={
                     uid:m.id,name:m.name||'Musyrif',email:m.email||'',hourlyRate:cfg.hourlyRate,baseSalary:cfg.baseSalary,
                     deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
-                    missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,autoNoReasonCount:0,details:[]
+                    requiredChecklistCount:0,checkedChecklistCount:0,missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,autoNoReasonCount:0,details:[]
                 };
             });
             const pending=[];
@@ -2033,12 +2033,17 @@
                         }
                         if(window.isUserOffForPayrollTask(m.id,task,dateObj,m.name||'Musyrif',overrideData)) continue;
                         const checked=!!(st.checklist&&st.checklist[task.id]);
-                        if(checked) continue;
+                        if(checked) {
+                            sum.requiredChecklistCount++;
+                            sum.checkedChecklistCount++;
+                            continue;
+                        }
                         if (dateKey === window.getYYYYMMDD()) {
                             const nowForTask = new Date();
                             const endForTask = parseTime(task.end, nowForTask);
                             if (nowForTask < endForTask) continue;
                         }
+                        sum.requiredChecklistCount++;
                         sum.missedChecklistCount++;
                         const reason=st.missedReasons&&(st.missedReasons[task.id]||st.missedReasons[String(task.id)]);
                         const ev=window.getPayrollTaskEvaluation({uid:m.id,name:m.name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true});
@@ -2110,23 +2115,38 @@
                     const net=s.baseSalary>0?Math.max(0,s.baseSalary-s.totalDeduction):null;
                     const periodClosed = report.period.boundaryEnd <= new Date();
                     const finalStatus=s.pendingCount?'<span class="text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-1 rounded-lg">BELUM FINAL</span>':(periodClosed?'<span class="text-[8px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg">FINAL</span>':'<span class="text-[8px] font-black text-blue-700 bg-blue-100 px-2 py-1 rounded-lg">SEMENTARA</span>');
+                    const checklistPct = s.requiredChecklistCount > 0 ? Math.round((s.checkedChecklistCount / s.requiredChecklistCount) * 100) : 0;
                     return `<div class="border border-slate-100 bg-white/70 rounded-2xl p-4">
-                        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3"><div><div class="flex items-center gap-2 flex-wrap"><div class="text-[13px] font-black text-blue-950">${window.escapeHtml(s.name)}</div>${finalStatus}</div><div class="text-[9px] font-bold text-slate-400 mt-1">${window.formatRupiah(s.hourlyRate)}/jam • ${s.baseSalary>0?'Gaji pokok '+window.formatRupiah(s.baseSalary):'Gaji pokok belum diatur'}</div></div><div class="text-left lg:text-right"><div class="text-[9px] font-black text-slate-400 uppercase">Total Potongan Final</div><div class="text-xl font-black text-rose-600">${window.formatRupiah(s.totalDeduction)}</div></div></div>
-                        <div class="grid grid-cols-2 lg:grid-cols-6 gap-2 mt-4">
-                            <div class="bg-amber-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-amber-600 uppercase">Denda Lupa Ceklis</div><div class="text-[11px] font-black text-amber-800 mt-0.5">${window.formatRupiah(s.deductionNoCheck)}</div><div class="text-[8px] font-bold text-amber-600/80 mt-1">${s.workedWithoutCheckCount} tugas dikerjakan</div></div>
-                            <div class="bg-rose-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-rose-600 uppercase">Potongan Tidak Dikerjakan</div><div class="text-[11px] font-black text-rose-800 mt-0.5">${window.formatRupiah(s.deductionWork)}</div><div class="text-[8px] font-bold text-rose-600/80 mt-1">${s.notDoneCount} tugas • ${(s.lostMinutes/60).toFixed(2)} jam</div></div>
+                        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap"><div class="text-[13px] font-black text-blue-950">${window.escapeHtml(s.name)}</div>${finalStatus}</div>
+                                <div class="text-[9px] font-bold text-slate-400 mt-1">${window.formatRupiah(s.hourlyRate)}/jam • ${s.baseSalary>0?'Gaji pokok '+window.formatRupiah(s.baseSalary):'Gaji pokok belum diatur'}</div>
+                            </div>
+                            <div class="text-left lg:text-right"><div class="text-[9px] font-black text-slate-400 uppercase">Total Potongan Final</div><div class="text-xl font-black text-rose-600">${window.formatRupiah(s.totalDeduction)}</div></div>
+                        </div>
+
+                        <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+                            <div class="flex items-center justify-between gap-3 mb-2.5">
+                                <div><div class="text-[9px] font-black text-blue-950">Aktivitas Ceklis Periode</div><div class="text-[8px] font-bold text-slate-400 mt-0.5">Tugas yang memang wajib diceklis sesuai jadwal kerja Musyrif</div></div>
+                                <div class="text-[10px] font-black text-blue-700">${checklistPct}% diceklis</div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div class="rounded-xl bg-white border border-blue-100 px-3 py-2.5"><div class="text-[7px] font-black uppercase text-slate-400">Tugas Wajib</div><div class="text-[17px] font-black text-blue-950 mt-0.5">${s.requiredChecklistCount}</div></div>
+                                <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2.5"><div class="text-[7px] font-black uppercase text-emerald-500">Sudah Diceklis</div><div class="text-[17px] font-black text-emerald-700 mt-0.5">${s.checkedChecklistCount}</div></div>
+                                <div class="rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5"><div class="text-[7px] font-black uppercase text-rose-500">Tidak Diceklis</div><div class="text-[17px] font-black text-rose-700 mt-0.5">${s.missedChecklistCount}</div></div>
+                            </div>
+                            <div class="h-1.5 rounded-full bg-blue-100 overflow-hidden mt-2.5"><div class="h-full bg-blue-600 rounded-full" style="width:${Math.max(0,Math.min(100,checklistPct))}%"></div></div>
+                            <div class="text-[8px] font-bold text-slate-500 mt-2">Dari ${s.missedChecklistCount} tugas yang tidak diceklis: <span class="text-rose-600">${s.notDoneCount} tidak dikerjakan</span> • <span class="text-amber-600">${s.workedWithoutCheckCount} dikerjakan tetapi lupa ceklis</span> • <span class="text-emerald-600">${s.validCount} uzur valid</span> • <span class="text-violet-600">${s.pendingCount} menunggu validasi</span>.</div>
+                        </div>
+
+                        <div class="grid grid-cols-2 lg:grid-cols-5 gap-2 mt-3">
+                            <div class="bg-amber-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-amber-600 uppercase">Lupa Ceklis</div><div class="text-[11px] font-black text-amber-800 mt-0.5">${window.formatRupiah(s.deductionNoCheck)}</div><div class="text-[8px] font-bold text-amber-600/80 mt-1">${s.workedWithoutCheckCount} tugas dikerjakan</div></div>
+                            <div class="bg-rose-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-[11px] font-black text-rose-800 mt-0.5">${window.formatRupiah(s.deductionWork)}</div><div class="text-[8px] font-bold text-rose-600/80 mt-1">${s.notDoneCount} tugas • ${(s.lostMinutes/60).toFixed(2)} jam</div></div>
                             <div class="bg-violet-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-violet-600 uppercase">Potensi Ditahan</div><div class="text-[11px] font-black text-violet-800 mt-0.5">${window.formatRupiah(s.pendingPotential)}</div><div class="text-[8px] font-bold text-violet-600/80 mt-1">${s.pendingCount} menunggu validasi</div></div>
-                            <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-slate-500 uppercase">Tidak Ceklis Total</div><div class="text-[11px] font-black text-slate-700 mt-0.5">${s.missedChecklistCount} tugas</div><div class="text-[8px] font-bold text-slate-400 mt-1">gabungan seluruh status</div></div>
                             <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-slate-500 uppercase">Jam Tidak Dikerjakan</div><div class="text-[11px] font-black text-slate-700 mt-0.5">${(s.lostMinutes/60).toFixed(2)} jam</div><div class="text-[8px] font-bold text-slate-400 mt-1">maks. ${Number(s.maxWorkHours || window.PAYROLL_DEFAULT_WORK_HOURS).toFixed(2)} jam</div></div>
-                            <div class="bg-emerald-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-emerald-600 uppercase">Gaji Bersih</div><div class="text-[11px] font-black text-emerald-800 mt-0.5">${net===null?'—':window.formatRupiah(net)}</div><div class="text-[8px] font-bold text-emerald-600/80 mt-1">setelah potongan final</div></div>
+                            <div class="bg-emerald-50 rounded-xl p-2.5 col-span-2 lg:col-span-1"><div class="text-[8px] font-black text-emerald-600 uppercase">Gaji Bersih</div><div class="text-[11px] font-black text-emerald-800 mt-0.5">${net===null?'—':window.formatRupiah(net)}</div><div class="text-[8px] font-bold text-emerald-600/80 mt-1">setelah potongan final</div></div>
                         </div>
-                        <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                            <div class="rounded-lg bg-rose-50 px-2.5 py-2"><div class="text-[7px] font-black uppercase text-rose-500">Tidak dikerjakan</div><div class="text-[10px] font-black text-rose-700 mt-0.5">${s.notDoneCount} tugas • ${(s.lostMinutes/60).toFixed(2)} jam</div></div>
-                            <div class="rounded-lg bg-amber-50 px-2.5 py-2"><div class="text-[7px] font-black uppercase text-amber-500">Dikerjakan, lupa ceklis</div><div class="text-[10px] font-black text-amber-700 mt-0.5">${s.workedWithoutCheckCount} tugas</div></div>
-                            <div class="rounded-lg bg-emerald-50 px-2.5 py-2"><div class="text-[7px] font-black uppercase text-emerald-500">Uzur valid</div><div class="text-[10px] font-black text-emerald-700 mt-0.5">${s.validCount} tugas</div></div>
-                            <div class="rounded-lg bg-violet-50 px-2.5 py-2"><div class="text-[7px] font-black uppercase text-violet-500">Menunggu validasi</div><div class="text-[10px] font-black text-violet-700 mt-0.5">${s.pendingCount} tugas</div></div>
-                        </div>
-                        <div class="text-[8px] font-bold text-slate-400 mt-2">Total tidak ceklis: ${s.missedChecklistCount} tugas = ${s.notDoneCount} tidak dikerjakan + ${s.workedWithoutCheckCount} dikerjakan tetapi lupa ceklis + ${s.validCount} uzur valid + ${s.pendingCount} menunggu validasi.${(s.wasHoursCapped || s.wasAmountCapped) ? ` <span class="text-amber-600">Potongan dibatasi maksimum ${Number(s.maxWorkHours || window.PAYROLL_DEFAULT_WORK_HOURS).toFixed(2)} jam / ${Number.isFinite(s.maxPayrollDeduction) ? window.formatRupiah(s.maxPayrollDeduction) : 'batas gaji periode'}.</span>` : ''}</div>
+                        ${(s.wasHoursCapped || s.wasAmountCapped) ? `<div class="text-[8px] font-bold text-amber-600 mt-2">Potongan dibatasi maksimum ${Number(s.maxWorkHours || window.PAYROLL_DEFAULT_WORK_HOURS).toFixed(2)} jam / ${Number.isFinite(s.maxPayrollDeduction) ? window.formatRupiah(s.maxPayrollDeduction) : 'batas gaji periode'}.</div>` : ''}
                     </div>`;
                 }).join('') || '<div class="text-center text-[10px] text-slate-400 font-bold py-6">Belum ada akun Musyrif.</div>';
             }
@@ -2249,7 +2269,7 @@
             const sum = {
                 uid:localDevUid,name,hourlyRate:cfg.hourlyRate,baseSalary:cfg.baseSalary,
                 deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
-                missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,details:[]
+                requiredChecklistCount:0,checkedChecklistCount:0,missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,details:[]
             };
             let cursor = new Date(period.start);
             while (cursor <= through) {
@@ -2266,12 +2286,17 @@
                     if (task.noCheck || (task.noCheckOn&&task.noCheckOn.includes(dateObj.getDay()))) continue;
                     if (window.isUserOffForPayrollTask(localDevUid,task,dateObj,name,overrideData)) continue;
                     const checked = !!(st.checklist&&st.checklist[task.id]);
-                    if (checked) continue;
+                    if (checked) {
+                        sum.requiredChecklistCount++;
+                        sum.checkedChecklistCount++;
+                        continue;
+                    }
                     if (dateKey === window.getYYYYMMDD()) {
                         const nowForTask = new Date();
                         const endForTask = parseTime(task.end, nowForTask);
                         if (nowForTask < endForTask) continue;
                     }
+                    sum.requiredChecklistCount++;
                     sum.missedChecklistCount++;
                     const reason = st.missedReasons&&(st.missedReasons[task.id]||st.missedReasons[String(task.id)]);
                     const ev = window.getPayrollTaskEvaluation({uid:localDevUid,name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true});
@@ -2308,20 +2333,28 @@
             if (periodEl) periodEl.textContent = `Periode ${window.formatPayrollPeriodLabel(p)} • data s.d. ${window.formatDateIndo(report.through)}`;
             const box = document.getElementById('musyrifPayrollSummary');
             if (!box) return;
+            const checklistPct = s.requiredChecklistCount > 0 ? Math.round((s.checkedChecklistCount / s.requiredChecklistCount) * 100) : 0;
             box.innerHTML = `
-                <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                    <div class="bg-slate-50 border border-slate-100 rounded-xl p-3"><div class="text-[8px] font-black text-slate-500 uppercase">Tidak Ceklis Total</div><div class="text-lg font-black text-blue-950 mt-1">${s.missedChecklistCount}</div><div class="text-[8px] font-bold text-slate-400">gabungan seluruh status</div></div>
-                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3"><div class="text-[8px] font-black text-amber-600 uppercase">Dikerjakan, Lupa Ceklis</div><div class="text-lg font-black text-amber-800 mt-1">${s.workedWithoutCheckCount}</div><div class="text-[8px] font-bold text-amber-500">Denda ${window.formatRupiah(s.deductionNoCheck)}</div></div>
-                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-lg font-black text-rose-800 mt-1">${s.notDoneCount}</div><div class="text-[8px] font-bold text-rose-500">${(s.lostMinutes/60).toFixed(2)} jam • maks. ${Number(s.maxWorkHours || window.PAYROLL_DEFAULT_WORK_HOURS).toFixed(2)} jam</div></div>
-                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3"><div class="text-[8px] font-black text-rose-600 uppercase">Potongan Tidak Dikerjakan</div><div class="text-[13px] font-black text-rose-800 mt-1">${window.formatRupiah(s.deductionWork)}</div></div>
-                    <div class="bg-violet-50 border border-violet-100 rounded-xl p-3"><div class="text-[8px] font-black text-violet-600 uppercase">Menunggu Validasi</div><div class="text-lg font-black text-violet-800 mt-1">${s.pendingCount}</div><div class="text-[8px] font-bold text-violet-500">Potensi maks. ${window.formatRupiah(s.pendingPotential)}</div></div>
-                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3"><div class="text-[8px] font-black text-emerald-600 uppercase">Total Potongan Final</div><div class="text-[15px] font-black text-emerald-800 mt-1">${window.formatRupiah(s.totalDeduction)}</div></div>
+                <div class="rounded-2xl border border-blue-100 bg-blue-50/40 p-3 mb-3">
+                    <div class="flex items-center justify-between gap-3 mb-2.5">
+                        <div><div class="text-[9px] font-black text-blue-950">Aktivitas Ceklis Periode</div><div class="text-[8px] font-bold text-slate-400 mt-0.5">Tugas wajib sesuai jadwal kerja Anda</div></div>
+                        <div class="text-[10px] font-black text-blue-700">${checklistPct}% diceklis</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="rounded-xl bg-white border border-blue-100 px-3 py-2.5"><div class="text-[7px] font-black uppercase text-slate-400">Tugas Wajib</div><div class="text-[17px] font-black text-blue-950 mt-0.5">${s.requiredChecklistCount}</div></div>
+                        <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2.5"><div class="text-[7px] font-black uppercase text-emerald-500">Sudah Diceklis</div><div class="text-[17px] font-black text-emerald-700 mt-0.5">${s.checkedChecklistCount}</div></div>
+                        <div class="rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5"><div class="text-[7px] font-black uppercase text-rose-500">Tidak Diceklis</div><div class="text-[17px] font-black text-rose-700 mt-0.5">${s.missedChecklistCount}</div></div>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-blue-100 overflow-hidden mt-2.5"><div class="h-full bg-blue-600 rounded-full" style="width:${Math.max(0,Math.min(100,checklistPct))}%"></div></div>
+                    <div class="text-[8px] font-bold text-slate-500 mt-2">Dari ${s.missedChecklistCount} tugas yang tidak diceklis: <span class="text-rose-600">${s.notDoneCount} tidak dikerjakan</span> • <span class="text-amber-600">${s.workedWithoutCheckCount} dikerjakan tetapi lupa ceklis</span> • <span class="text-emerald-600">${s.validCount} uzur valid</span> • <span class="text-violet-600">${s.pendingCount} menunggu validasi</span>.</div>
                 </div>
-                <div class="mt-3 grid grid-cols-2 gap-2">
-                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5"><div class="text-[8px] font-black text-emerald-500 uppercase">Uzur Valid</div><div class="text-[11px] font-black text-emerald-700 mt-0.5">${s.validCount} tugas</div></div>
-                    <div class="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2.5"><div class="text-[8px] font-black text-violet-500 uppercase">Menunggu Keputusan</div><div class="text-[11px] font-black text-violet-700 mt-0.5">${s.pendingCount} tugas</div></div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-lg font-black text-rose-800 mt-1">${s.notDoneCount} tugas</div><div class="text-[8px] font-bold text-rose-500">${(s.lostMinutes/60).toFixed(2)} jam • potongan ${window.formatRupiah(s.deductionWork)}</div></div>
+                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3"><div class="text-[8px] font-black text-amber-600 uppercase">Dikerjakan, Lupa Ceklis</div><div class="text-lg font-black text-amber-800 mt-1">${s.workedWithoutCheckCount} tugas</div><div class="text-[8px] font-bold text-amber-500">Denda ${window.formatRupiah(s.deductionNoCheck)}</div></div>
+                    <div class="bg-violet-50 border border-violet-100 rounded-xl p-3"><div class="text-[8px] font-black text-violet-600 uppercase">Menunggu Validasi</div><div class="text-lg font-black text-violet-800 mt-1">${s.pendingCount} tugas</div><div class="text-[8px] font-bold text-violet-500">Potensi maks. ${window.formatRupiah(s.pendingPotential)}</div></div>
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3"><div class="text-[8px] font-black text-emerald-600 uppercase">Total Potongan Final</div><div class="text-[15px] font-black text-emerald-800 mt-1">${window.formatRupiah(s.totalDeduction)}</div><div class="text-[8px] font-bold text-emerald-600/80 mt-1">${s.validCount} uzur valid • Rp0</div></div>
                 </div>
-                <div class="mt-2 text-[9px] font-bold text-slate-500 bg-white/70 border border-slate-100 rounded-xl px-3 py-2.5">Total tidak ceklis: ${s.missedChecklistCount} tugas = ${s.notDoneCount} tidak dikerjakan + ${s.workedWithoutCheckCount} dikerjakan tetapi lupa ceklis + ${s.validCount} uzur valid + ${s.pendingCount} menunggu validasi.${(s.wasHoursCapped || s.wasAmountCapped) ? ` <span class="text-amber-600">Jam/potongan telah dibatasi maksimal sesuai jam kerja periode.</span>` : ''}</div>`;
+                ${(s.wasHoursCapped || s.wasAmountCapped) ? `<div class="mt-2 text-[8px] font-bold text-amber-600">Jam/potongan telah dibatasi maksimal sesuai jam kerja periode.</div>` : ''}`;
         };
 
         window.loadMyPayrollDashboard = async function(force=false) {
