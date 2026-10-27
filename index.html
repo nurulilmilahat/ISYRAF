@@ -119,6 +119,43 @@
 </head>
 <body class="text-slate-800 antialiased min-h-screen pb-24">
 
+    <!-- MODAL KONFIRMASI PELAKSANAAN TUGAS -->
+    <div id="modal-task-confirmation" class="hidden fixed inset-0 z-[260] flex items-center justify-center bg-blue-950/65 backdrop-blur-sm animate-fade-in px-4 py-4">
+        <div class="w-full max-w-[420px] rounded-[1.75rem] bg-white shadow-2xl border border-white/70 p-4 sm:p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 shrink-0 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                    <i class="fas fa-clipboard-check text-lg"></i>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="text-[16px] sm:text-[17px] font-black text-blue-950 leading-tight">Konfirmasi Pelaksanaan Tugas</h3>
+                    <p class="text-[9px] font-bold text-slate-400 mt-0.5">Pastikan ceklis sesuai dengan pelaksanaan sebenarnya.</p>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 mb-3">
+                <div class="flex items-start gap-2.5">
+                    <i class="fas fa-triangle-exclamation text-amber-500 mt-0.5"></i>
+                    <div>
+                        <div class="text-[13px] font-black text-amber-900 leading-snug">Takutlah kepada Allah dalam amanah ini.</div>
+                        <div class="text-[11px] font-bold text-amber-800/90 leading-relaxed mt-0.5">Jangan ceklis tugas yang belum benar-benar dikerjakan.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-2xl bg-slate-50 border border-slate-200 px-3.5 py-3 mb-3">
+                <div class="text-[8px] font-black uppercase tracking-wider text-slate-400 mb-1">Tugas</div>
+                <div id="task-confirmation-title" class="text-[12px] sm:text-[13px] font-extrabold text-blue-950 leading-snug">-</div>
+            </div>
+
+            <p class="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-relaxed mb-3.5">Dengan menekan konfirmasi, Anda menyatakan tugas ini telah dilaksanakan sebagaimana mestinya.</p>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <button type="button" onclick="closeTaskCheckConfirmation()" class="min-h-[42px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] sm:text-[11px] font-black transition px-2">Belum Dikerjakan</button>
+                <button type="button" onclick="confirmTaskCheck()" class="min-h-[42px] rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-[10px] sm:text-[11px] font-black transition shadow-md px-2"><i class="fas fa-check mr-1"></i> Ya, Saya Konfirmasi</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL RIWAYAT AUDIT AKTIVITAS -->
     <div id="modal-audit-history" class="hidden fixed inset-0 z-[230] flex items-center justify-center bg-blue-950/60 backdrop-blur-sm animate-fade-in px-4">
         <div class="glass-card w-full max-w-4xl rounded-[2rem] p-5 md:p-6 shadow-2xl bg-white max-h-[92vh] overflow-hidden flex flex-col">
@@ -4137,7 +4174,31 @@
             }
         }
 
-        window.toggleTask = async (taskId) => {
+        window.pendingTaskConfirmationId = null;
+
+        window.openTaskCheckConfirmation = function(task) {
+            if (!task) return;
+            window.pendingTaskConfirmationId = task.id;
+            const title = document.getElementById('task-confirmation-title');
+            const modal = document.getElementById('modal-task-confirmation');
+            if (title) title.textContent = task.title || 'Tugas Musyrif';
+            if (modal) modal.classList.remove('hidden');
+        };
+
+        window.closeTaskCheckConfirmation = function() {
+            window.pendingTaskConfirmationId = null;
+            document.getElementById('modal-task-confirmation')?.classList.add('hidden');
+        };
+
+        window.confirmTaskCheck = function() {
+            const taskId = window.pendingTaskConfirmationId;
+            if (taskId === null || taskId === undefined) return;
+            window.pendingTaskConfirmationId = null;
+            document.getElementById('modal-task-confirmation')?.classList.add('hidden');
+            window.toggleTask(taskId, true);
+        };
+
+        window.toggleTask = async (taskId, confirmed = false) => {
             const now = new Date();
             const scheduleHariIni = generateSchedule(globalPrayers, now.getDay());
             const task = scheduleHariIni.find(t => t.id === taskId);
@@ -4152,6 +4213,13 @@
             if (now >= e && !window.checklistState[taskId]) return showToast("Waktu ceklis untuk sesi ini sudah ditutup!", "error");
 
             const wasChecked = !!window.checklistState[taskId];
+
+            // Ceklis baru wajib dikonfirmasi terlebih dahulu. Membatalkan ceklis tetap langsung seperti sebelumnya.
+            if (!wasChecked && !confirmed) {
+                window.openTaskCheckConfirmation(task);
+                return;
+            }
+
             if (wasChecked) {
                 delete window.checklistState[taskId];
             } else {
@@ -4640,7 +4708,7 @@
                 } else {
                     sCls = 'bg-white shadow-xl ring-[5px] ring-blue-50 transform scale-[1.02] z-10';
                     tCls = 'text-blue-950 font-black';
-                    iHTML = `<input type="checkbox" ${isChecked?'checked':''} onchange="toggleTask(${task.id})" class="w-8 h-8 text-blue-600 rounded-xl cursor-pointer">`;
+                    iHTML = `<input type="checkbox" ${isChecked?'checked':''} onclick="event.preventDefault(); toggleTask(${task.id})" aria-label="Ceklis ${window.escapeHtml(task.title)}" class="w-8 h-8 text-blue-600 rounded-xl cursor-pointer">`;
                     bHTML = '<span class="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg ml-2 font-black animate-pulse uppercase">AKTIF</span>';
                     bCls = 'border-l-[6px] border-l-amber-500';
                 }
