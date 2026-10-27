@@ -1024,7 +1024,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, where, orderBy, limit, startAfter, serverTimestamp, getDocs, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, orderBy, limit, startAfter, serverTimestamp, getDocs, getDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -1063,6 +1063,11 @@
         window.payrollLoading = false;
         window.payrollPrayerCache = {};
         window.payrollCityId = null;
+        // Validasi payroll dibuat non-blocking: setiap kartu menyimpan sendiri dan
+        // kalkulasi ulang periode hanya dijalankan sekali setelah rangkaian klik berhenti.
+        window.payrollValidationInFlight = new Set();
+        window.payrollValidationRefreshTimer = null;
+        window.payrollValidationRefreshDelay = 3500;
 
         // Navigasi tab khusus halaman Pimpinan. Hanya mengatur tampilan; fungsi/data lama tetap sama.
         window.switchAdminTab = function(tabName) {
@@ -1897,40 +1902,130 @@
             return '<span class="text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-1 rounded-lg">MENUNGGU VALIDASI</span>';
         };
 
-        window.validateMissedTask = async function(uid, taskId, decision, dateKey = window.adminSelectedDate) {
+        window.schedulePayrollValidationRefresh = function() {
+            clearTimeout(window.payrollValidationRefreshTimer);
+            window.payrollValidationRefreshTimer = setTimeout(async () => {
+                // Jangan mulai kalkulasi periode ketika masih ada kartu yang sedang disimpan.
+                if (window.payrollValidationInFlight?.size) {
+                    window.schedulePayrollValidationRefresh();
+                    return;
+                }
+                const payrollTab = document.getElementById('admin-tab-payroll');
+                if (!payrollTab || payrollTab.classList.contains('hidden')) return;
+                window.payrollLastReport = null;
+                await window.loadPayrollDashboard(true);
+            }, window.payrollValidationRefreshDelay || 3500);
+        };
+
+        window.setPayrollValidationCardBusy = function(button, busy, label = 'Menyimpan...') {
+            if (!button) return null;
+            const card = button.closest('[data-payroll-validation-card]');
+            if (!card) return null;
+            const buttons = card.querySelectorAll('button');
+            if (busy) {
+                card.dataset.validationBusy = '1';
+                card.classList.add('opacity-70');
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.add('cursor-wait');
+                    if (btn === button && !btn.dataset.originalHtml) {
+                        btn.dataset.originalHtml = btn.innerHTML;
+                        btn.innerHTML = `<i class="fas fa-circle-notch fa-spin mr-1"></i>${label}`;
+                    }
+                });
+            } else {
+                delete card.dataset.validationBusy;
+                card.classList.remove('opacity-70');
+                buttons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('cursor-wait');
+                    if (btn.dataset.originalHtml) {
+                        btn.innerHTML = btn.dataset.originalHtml;
+                        delete btn.dataset.originalHtml;
+                    }
+                });
+            }
+            return card;
+        };
+
+        window.removeValidatedPayrollCard = function(card, validationKey) {
+            if (!card) return;
+            card.style.transition = 'opacity .18s ease, transform .18s ease, max-height .22s ease, margin .22s ease, padding .22s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(-4px)';
+            card.style.maxHeight = card.scrollHeight + 'px';
+            requestAnimationFrame(() => {
+                card.style.maxHeight = '0px';
+                card.style.marginTop = '0';
+                card.style.marginBottom = '0';
+                card.style.paddingTop = '0';
+                card.style.paddingBottom = '0';
+            });
+            setTimeout(() => card.remove(), 230);
+
+            // Kurangi badge pending secara langsung agar UI responsif tanpa menghitung ulang sebulan.
+            const badge = document.getElementById('payrollPendingCount');
+            if (badge) {
+                const current = parseInt(badge.textContent, 10);
+                if (Number.isFinite(current)) badge.textContent = `${Math.max(0, current - 1)} pending`;
+            }
+
+            // Hapus item dari cache tampilan saja. Ringkasan uang akan disinkronkan satu kali
+            // setelah user berhenti melakukan validasi beberapa saat.
+            if (window.payrollLastReport?.pending && validationKey) {
+                window.payrollLastReport.pending = window.payrollLastReport.pending.filter(x =>
+                    `${x.dateKey}__${x.uid}__${x.taskId}` !== validationKey
+                );
+            }
+        };
+
+        window.validateMissedTask = async function(uid, taskId, decision, dateKey = window.adminSelectedDate, triggerButton = null) {
             if (currentRole !== 'admin') return showToast('Hanya Pimpinan yang dapat memvalidasi alasan.', 'error');
             if (!['valid','invalid_worked','invalid_not_done'].includes(decision)) return;
+
+            const validationKey = `${dateKey}__${uid}__${taskId}`;
+            if (window.payrollValidationInFlight?.has(validationKey)) return;
+            window.payrollValidationInFlight.add(validationKey);
+
+            const card = window.setPayrollValidationCardBusy(triggerButton, true);
+            const labels = {
+                valid:'Uzur Valid — Bebas Potongan',
+                invalid_worked:'Alasan Ditolak — Tugas Dikerjakan (Potongan Tidak Ceklis Rp1.000)',
+                invalid_not_done:'Alasan Ditolak — Tugas Tidak Dikerjakan (Potongan Sesuai Jam, Minimum Rp1.000)'
+            };
+
             try {
                 const ref = doc(db, 'artifacts', appId, 'public', 'data', 'states_' + dateKey, uid);
-                const snap = await getDoc(ref);
-                if (!snap.exists()) return showToast('Data tugas tidak ditemukan.', 'error');
-                const data = snap.data() || {};
-                const reasons = { ...(data.missedReasons || {}) };
-                const key = Object.prototype.hasOwnProperty.call(reasons, taskId) ? taskId : String(taskId);
-                if (!reasons[key]) return showToast('Musyrif belum mengisi alasan untuk tugas ini.', 'error');
                 const actorName = localStorage.getItem('isyrafUserName') || 'Pimpinan';
-                reasons[key] = {
-                    ...reasons[key],
-                    validation: {
-                        decision,
-                        validatedByUid: localDevUid || '',
-                        validatedByName: actorName,
-                        validatedAt: new Date().toISOString()
-                    }
+                const validation = {
+                    decision,
+                    validatedByUid: localDevUid || '',
+                    validatedByName: actorName,
+                    validatedAt: new Date().toISOString()
                 };
-                await setDoc(ref, { missedReasons: reasons, lastUpdate: serverTimestamp() }, { merge:true });
-                const labels = {
-                    valid:'Uzur Valid — Bebas Potongan',
-                    invalid_worked:'Alasan Ditolak — Tugas Dikerjakan (Potongan Tidak Ceklis Rp1.000)',
-                    invalid_not_done:'Alasan Ditolak — Tugas Tidak Dikerjakan (Potongan Sesuai Jam, Minimum Rp1.000)'
-                };
-                await window.logActivity('payroll', `Validasi tugas terlewat: ${labels[decision]}.`, { uid, taskId, dateKey, decision });
+
+                // Update hanya field validasi milik satu tugas. Tidak perlu getDoc terlebih dahulu
+                // dan tidak menulis ulang seluruh missedReasons, sehingga klik paralel aman dari lost update.
+                await updateDoc(ref, {
+                    [`missedReasons.${String(taskId)}.validation`]: validation,
+                    lastUpdate: serverTimestamp()
+                });
+
+                window.removeValidatedPayrollCard(card, validationKey);
                 showToast(`Keputusan disimpan: ${labels[decision]}.`, 'success');
-                window.payrollLastReport = null;
-                if (document.getElementById('admin-tab-payroll') && !document.getElementById('admin-tab-payroll').classList.contains('hidden')) await window.loadPayrollDashboard(true);
+
+                // Audit tidak menahan interaksi user. Jika audit gagal, keputusan validasi tetap tersimpan.
+                Promise.resolve(window.logActivity('payroll', `Validasi tugas terlewat: ${labels[decision]}.`, { uid, taskId, dateKey, decision }))
+                    .catch(e => console.warn('Audit validasi payroll gagal:', e));
+
+                // Debounce: puluhan validasi beruntun hanya memicu satu kalkulasi ulang periode.
+                window.schedulePayrollValidationRefresh();
             } catch(e) {
                 console.error('Validate missed task:', e);
-                showToast('Gagal menyimpan validasi.', 'error');
+                window.setPayrollValidationCardBusy(triggerButton, false);
+                showToast('Gagal menyimpan validasi. Coba lagi.', 'error');
+            } finally {
+                window.payrollValidationInFlight.delete(validationKey);
             }
         };
 
@@ -2094,7 +2189,7 @@
             const pendingCount=document.getElementById('payrollPendingCount'); if(pendingCount) pendingCount.textContent=`${report.pending.length} pending`;
             const pend=document.getElementById('payrollPendingValidation');
             if(pend){
-                pend.innerHTML = report.pending.length ? report.pending.map(x=>`<div class="border border-violet-100 bg-violet-50/50 rounded-2xl p-3">
+                pend.innerHTML = report.pending.length ? report.pending.map(x=>`<div data-payroll-validation-card="${window.escapeHtml(`${x.dateKey}__${x.uid}__${x.taskId}`)}" class="border border-violet-100 bg-violet-50/50 rounded-2xl p-3 overflow-hidden">
                     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                         <div class="min-w-0">
                             <div class="text-[9px] font-black text-violet-600">${window.escapeHtml(x.dateKey)} • ${window.escapeHtml(x.start)}–${window.escapeHtml(x.end)}</div>
@@ -2103,9 +2198,9 @@
                             <div class="text-[9px] font-bold text-slate-400 mt-1">Jika tugas dikerjakan tetapi lupa ceklis: ${window.formatRupiah(x.noCheckPotential)} • Jika tidak dikerjakan: ${window.formatRupiah(x.maximumDeduction)} (minimum ${window.formatRupiah(x.noCheckPotential)})</div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5 shrink-0">
-                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'valid','${x.dateKey}')" class="text-[9px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-2 rounded-xl">Valid</button>
-                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'invalid_worked','${x.dateKey}')" class="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-2 rounded-xl">Invalid • Dikerjakan</button>
-                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'invalid_not_done','${x.dateKey}')" class="text-[9px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-2.5 py-2 rounded-xl">Invalid • Tidak Dikerjakan</button>
+                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'valid','${x.dateKey}',this)" class="text-[9px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-2 rounded-xl">Valid</button>
+                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'invalid_worked','${x.dateKey}',this)" class="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-2 rounded-xl">Invalid • Dikerjakan</button>
+                            <button onclick="validateMissedTask('${x.uid}',${x.taskId},'invalid_not_done','${x.dateKey}',this)" class="text-[9px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-2.5 py-2 rounded-xl">Invalid • Tidak Dikerjakan</button>
                         </div>
                     </div></div>`).join('') : '<div class="text-center text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-2xl py-4"><i class="fas fa-check-circle mr-1"></i> Tidak ada alasan yang menunggu validasi pada periode ini.</div>';
             }
