@@ -1234,11 +1234,14 @@
             if (!taskStart) return { start: taskStart, end: taskEnd };
             const [h, m] = taskStart.split(':').map(Number);
             const mins = h * 60 + m;
-            
-            if (mins >= 230 && mins <= 445) return { start: '03:50', end: '07:30' };
-            if (mins >= 900 && mins < 1075) return { start: '15:00', end: '18:10' };
-            if (mins >= 1075 && mins <= 1320) return { start: '17:55', end: '22:10' };
-            
+
+            // Audit integritas ceklis: jendela boleh ditutup lebih lambat per blok agar musyrif
+            // masih sempat mencatat, tetapi TIDAK boleh dibuka sebelum tugas itu sendiri mulai.
+            if (mins >= 230 && mins <= 445) return { start: taskStart, end: '07:30' };
+            // Persiapan Asar bersifat dinamis dan dapat mulai sebelum 15.00.
+            if (mins >= 840 && mins < 1075) return { start: taskStart, end: '18:10' };
+            if (mins >= 1075 && mins <= 1320) return { start: taskStart, end: '22:10' };
+
             return { start: taskStart, end: taskEnd };
         };
 
@@ -1886,9 +1889,13 @@
             return 'Menunggu Validasi Pimpinan';
         };
 
-        window.getPayrollTaskEvaluation = function({uid, name, task, missedReason, isChecked=false, isLeave=false, ended=true}) {
+        window.getPayrollTaskEvaluation = function({uid, name, task, missedReason, isChecked=false, isLeave=false, ended=true, durationMinutesOverride=null}) {
             const cfg = window.getPayrollUserConfig(uid, name);
-            const durationMinutes = window.getTaskDurationMinutes(task);
+            // Payroll boleh menerima durasi efektif yang sudah diaudit: dipotong waktu libur
+            // dan overlap dengan tugas lain agar satu menit kerja tidak dihitung dua kali.
+            const durationMinutes = Number.isFinite(Number(durationMinutesOverride))
+                ? Math.max(0, Number(durationMinutesOverride))
+                : window.getTaskDurationMinutes(task);
             const rawWorkDeduction = Math.round((durationMinutes / 60) * cfg.hourlyRate);
             const noCheckPenalty = Math.round(Number(window.payrollConfig?.flatForgotPenalty) || 1000);
             // Jika tugas tidak dikerjakan, hanya SATU potongan yang berlaku:
@@ -2071,31 +2078,40 @@
             try {
                 if (!window.payrollCityId) {
                     const cityRes = await fetch('https://api.myquran.com/v2/sholat/kota/cari/Lahat');
+                    if (!cityRes.ok) throw new Error(`Gagal mencari kota (${cityRes.status})`);
                     const cityData = await cityRes.json();
                     window.payrollCityId = cityData.data?.[0]?.id || null;
+                    if (!window.payrollCityId) throw new Error('ID kota Lahat tidak ditemukan');
                 }
                 const [y,m,d] = dateKey.split('-');
-                if (window.payrollCityId) {
-                    const res = await fetch(`https://api.myquran.com/v2/sholat/jadwal/${window.payrollCityId}/${y}/${m}/${d}`);
-                    const data = await res.json();
-                    const p = data.data?.jadwal;
-                    if (p) {
-                        const out = { subuh:p.subuh, dzuhur:p.dzuhur, ashar:p.ashar, maghrib:p.maghrib, isya:p.isya };
-                        window.payrollPrayerCache[dateKey] = out;
-                        return out;
-                    }
+                const res = await fetch(`https://api.myquran.com/v2/sholat/jadwal/${window.payrollCityId}/${y}/${m}/${d}`);
+                if (!res.ok) throw new Error(`Gagal mengambil jadwal salat (${res.status})`);
+                const data = await res.json();
+                const p = data.data?.jadwal;
+                if (!p?.subuh || !p?.dzuhur || !p?.ashar || !p?.maghrib || !p?.isya) {
+                    throw new Error('Data jadwal salat tidak lengkap');
                 }
-            } catch(e) { console.warn('Prayer payroll fallback', dateKey, e); }
-            const fallback = Object.keys(globalPrayers || {}).length ? globalPrayers : {subuh:'04:50',dzuhur:'12:10',ashar:'15:30',maghrib:'18:15',isya:'19:30'};
-            window.payrollPrayerCache[dateKey] = fallback;
-            return fallback;
+                const out = { subuh:p.subuh, dzuhur:p.dzuhur, ashar:p.ashar, maghrib:p.maghrib, isya:p.isya };
+                window.payrollPrayerCache[dateKey] = out;
+                return out;
+            } catch(e) {
+                console.error('Prayer payroll historical data unavailable', dateKey, e);
+                // Untuk payroll, jangan pernah memakai waktu salat hari ini sebagai pengganti
+                // tanggal historis. Lebih aman gagal menghitung daripada menghasilkan potongan salah.
+                throw new Error(`Jadwal salat historis ${dateKey} tidak dapat diverifikasi.`);
+            }
         };
 
         window.getPayrollOverrideForDate = async function(dateKey) {
             try {
                 const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'work_schedule_overrides', dateKey));
                 return snap.exists() ? snap.data() : null;
-            } catch(e) { return null; }
+            } catch(e) {
+                console.error('Payroll override read failed', dateKey, e);
+                // Jangan diam-diam menganggap tidak ada override, karena dapat membuat musyrif
+                // yang sebenarnya libur justru terkena potongan.
+                throw new Error(`Jadwal libur/override ${dateKey} tidak dapat diverifikasi.`);
+            }
         };
 
         window.isUserOffForPayrollTask = function(uid, task, dateObj, name, overrideData) {
@@ -2126,6 +2142,96 @@
             return intervals.some(x=>start>=x.start&&start<x.end);
         };
 
+
+        // Versi interval untuk audit payroll historis. Sumber jadwal libur sama persis dengan
+        // isUserOffForPayrollTask, tetapi dipakai juga untuk memotong bagian tugas yang melewati
+        // awal jam libur (contoh: tugas 15.40–17.35 saat libur mulai 17.00).
+        window.getPayrollOffIntervals = function(uid, dateObj, name, overrideData) {
+            const day=dateObj.getDay(), week=window.getWorkWeekNumber(dateObj);
+            const ov = overrideData && overrideData.dateKey === window.getYYYYMMDD(dateObj) ? overrideData : null;
+            const mode = ov?.entries?.[uid]?.mode;
+            let intervals=[];
+            const regularOff=()=> day===6?[{start:1020,end:1440}]:day===0?[{start:0,end:1020}]:[{start:0,end:1440}];
+            if (mode && mode !== 'follow') {
+                if (mode==='duty') intervals=[];
+                else if(mode==='off_full') intervals=[{start:0,end:1440}];
+                else if(mode==='off_regular') intervals=regularOff();
+                else if(mode==='off_morning') intervals=[{start:230,end:760}];
+                else if(mode==='off_evening') intervals=[{start:900,end:1320}];
+                return intervals;
+            }
+            const pattern=window.getEffectiveWorkSchedulePattern();
+            const norm=window.normalizeMusyrifName(name);
+            const inGroup=(uidKey,nameKey)=> (pattern[uidKey]||[]).includes(uid) || (pattern[nameKey]||[]).some(n=>window.normalizeMusyrifName(n)===norm);
+            if(week<=4){
+                const off=(week===1||week===3)?inGroup('week13OffUids','week13OffNames'):inGroup('week24OffUids','week24OffNames');
+                if(off&&(day===6||day===0)) intervals=regularOff();
+            } else if(week===5&&day===0){
+                if(inGroup('week5MorningOffUids','week5MorningOffNames')) intervals.push({start:230,end:760});
+                if(inGroup('week5EveningOffUids','week5EveningOffNames')) intervals.push({start:900,end:1320});
+            }
+            return intervals;
+        };
+
+        window.mergePayrollMinuteRanges = function(ranges) {
+            const src=(ranges||[]).filter(r=>Number.isFinite(r.start)&&Number.isFinite(r.end)&&r.end>r.start).sort((a,b)=>a.start-b.start||a.end-b.end);
+            const out=[];
+            src.forEach(r=>{
+                const last=out[out.length-1];
+                if(!last || r.start>last.end) out.push({start:r.start,end:r.end});
+                else last.end=Math.max(last.end,r.end);
+            });
+            return out;
+        };
+
+        window.subtractPayrollRanges = function(baseRanges, cuts) {
+            let result=(baseRanges||[]).map(r=>({start:r.start,end:r.end}));
+            for(const c of (cuts||[])){
+                const next=[];
+                for(const r of result){
+                    if(c.end<=r.start || c.start>=r.end) { next.push(r); continue; }
+                    if(c.start>r.start) next.push({start:r.start,end:Math.min(c.start,r.end)});
+                    if(c.end<r.end) next.push({start:Math.max(c.end,r.start),end:r.end});
+                }
+                result=next;
+            }
+            return result.filter(r=>r.end>r.start);
+        };
+
+        window.getPayrollEffectiveTaskDuration = function({uid, name, task, dateObj, overrideData, coveredRanges=[]}) {
+            const start=window.timeToMinutes(task?.start || '');
+            const end=window.timeToMinutes(task?.end || '');
+            const startOff=window.isUserOffForPayrollTask(uid, task, dateObj, name, overrideData);
+
+            // Agar konsisten dengan UI ceklis saat ini: bila tugas DIMULAI ketika musyrif sedang
+            // libur, tugas tersebut tidak diwajibkan oleh payroll. Jika tugas mulai saat piket lalu
+            // melewati awal waktu libur, hanya bagian sebelum libur yang dihitung.
+            if(startOff) return { required:false, validInterval:end>start, minutes:0, ranges:[], rawMinutes:Math.max(0,end-start), startOff:true };
+
+            // Interval terbalik tidak lagi dijadikan 24 jam dan juga tidak dihapus dari kewajiban
+            // ceklis. Tugas tetap wajib, tetapi durasi jamnya = 0 sehingga bila tidak dikerjakan
+            // hanya minimum Rp1.000 yang berlaku sampai jadwal dasarnya diperbaiki.
+            if(!Number.isFinite(start) || !Number.isFinite(end) || end<=start){
+                return { required:true, validInterval:false, minutes:0, ranges:[], rawMinutes:0, startOff:false };
+            }
+
+            let ranges=[{start,end}];
+            ranges=window.subtractPayrollRanges(ranges, window.getPayrollOffIntervals(uid,dateObj,name,overrideData));
+            const dutyRanges=ranges.map(r=>({start:r.start,end:r.end}));
+            const uniqueRanges=window.subtractPayrollRanges(dutyRanges, window.mergePayrollMinuteRanges(coveredRanges));
+            const minutes=uniqueRanges.reduce((n,r)=>n+(r.end-r.start),0);
+            const rawMinutes=dutyRanges.reduce((n,r)=>n+(r.end-r.start),0);
+            return { required:true, validInterval:true, minutes, ranges:dutyRanges, uniqueRanges, rawMinutes, startOff:false, overlappedMinutes:Math.max(0,rawMinutes-minutes) };
+        };
+
+        window.getPayrollTaskClosedForDate = function(task, dateKey) {
+            if(dateKey !== window.getYYYYMMDD()) return true;
+            const now = new Date();
+            const cp = window.getCheckpointWindow(task.start, task.end);
+            const close = parseTime(cp.end || task.end, now);
+            return now >= close;
+        };
+
         window.buildPayrollReport = async function(monthValue) {
             await window.ensurePayrollConfig();
             const period = window.getPayrollPeriod(monthValue);
@@ -2142,6 +2248,7 @@
                 };
             });
             const pending=[];
+            const reportWarnings = new Set();
             let cursor=new Date(period.start);
             while(cursor<=through){
                 const dateObj=new Date(cursor); dateObj.setHours(12,0,0,0);
@@ -2155,30 +2262,34 @@
                 const sched=generateSchedule(prayers,dateObj.getDay());
                 for(const m of users){
                     const sum=summaries[m.id]; const st=states[m.id]||{};
+                    let dayCoveredRanges=[];
                     for(const task of sched){
                         if(task.noCheck || (task.noCheckOn&&task.noCheckOn.includes(dateObj.getDay()))) continue;
-                        // Pengaman payroll: interval dinamis yang terbalik/tidak valid tidak boleh
-                        // dianggap tugas lintas tengah malam dan tidak boleh menghasilkan potongan.
-                        if (!window.isValidPayrollTaskInterval(task)) {
-                            console.warn('ISYRAF payroll: interval tugas tidak valid dilewati', dateKey, task.id, task.start, task.end, task.title);
-                            continue;
+                        const payrollDur = window.getPayrollEffectiveTaskDuration({
+                            uid:m.id,name:m.name||'Musyrif',task,dateObj,overrideData,coveredRanges:dayCoveredRanges
+                        });
+                        if(!payrollDur.required) continue;
+                        // Semua interval duty valid ikut menutup timeline agar menit overlap tidak
+                        // dapat dibebankan lagi oleh tugas berikutnya, terlepas tugas diceklis/tidak.
+                        if(payrollDur.validInterval && payrollDur.ranges.length){
+                            dayCoveredRanges = window.mergePayrollMinuteRanges([...dayCoveredRanges, ...payrollDur.ranges]);
                         }
-                        if(window.isUserOffForPayrollTask(m.id,task,dateObj,m.name||'Musyrif',overrideData)) continue;
+                        if(!payrollDur.validInterval) {
+                            reportWarnings.add(`${dateKey}: interval tidak valid — ${task.title} (${task.start}–${task.end}); durasi payroll dibuat 0 menit.`);
+                        } else if(payrollDur.overlappedMinutes>0) {
+                            reportWarnings.add(`${dateKey}: overlap ${payrollDur.overlappedMinutes} menit pada ${task.title}; menit overlap tidak dihitung dua kali.`);
+                        }
                         const checked=!!(st.checklist&&st.checklist[task.id]);
                         if(checked) {
                             sum.requiredChecklistCount++;
                             sum.checkedChecklistCount++;
                             continue;
                         }
-                        if (dateKey === window.getYYYYMMDD()) {
-                            const nowForTask = new Date();
-                            const endForTask = parseTime(task.end, nowForTask);
-                            if (nowForTask < endForTask) continue;
-                        }
+                        if (!window.getPayrollTaskClosedForDate(task, dateKey)) continue;
                         sum.requiredChecklistCount++;
                         sum.missedChecklistCount++;
                         const reason=st.missedReasons&&(st.missedReasons[task.id]||st.missedReasons[String(task.id)]);
-                        const ev=window.getPayrollTaskEvaluation({uid:m.id,name:m.name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true});
+                        const ev=window.getPayrollTaskEvaluation({uid:m.id,name:m.name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true,durationMinutesOverride:payrollDur.minutes});
                         if(ev.status==='Tidak Dikerjakan'){
                             sum.deductionNoCheck+=ev.noCheckDeduction;
                             sum.deductionWork+=ev.workDeduction;
@@ -2200,20 +2311,22 @@
                                 dateKey,uid:m.id,name:m.name||'Musyrif',taskId:task.id,taskTitle:task.title,start:task.start,end:task.end,reason,
                                 maximumDeduction:ev.maximumDeduction,
                                 noCheckPotential:Math.round(Number(window.payrollConfig?.flatForgotPenalty)||1000),
-                                workPotential:Math.round((window.getTaskDurationMinutes(task)/60)*window.getPayrollUserConfig(m.id,m.name).hourlyRate)
+                                durationMinutes:ev.durationMinutes,
+                                workPotential:Math.round((ev.durationMinutes/60)*window.getPayrollUserConfig(m.id,m.name).hourlyRate)
                             });
                         }
                         if(ev.status!=='Dikerjakan') sum.details.push({
                             dateKey,taskId:task.id,taskTitle:task.title,start:task.start,end:task.end,status:ev.status,
                             deduction:ev.deduction,noCheckDeduction:ev.noCheckDeduction||0,workDeduction:ev.workDeduction||0,
-                            pendingPotential:ev.pendingPotential,lostMinutes:ev.lostMinutes,reason
+                            pendingPotential:ev.pendingPotential,lostMinutes:ev.lostMinutes,durationMinutes:ev.durationMinutes,
+                            maximumDeduction:ev.maximumDeduction,intervalValid:payrollDur.validInterval,overlappedMinutes:payrollDur.overlappedMinutes||0,reason
                         });
                     }
                 }
                 cursor.setDate(cursor.getDate()+1);
             }
             Object.values(summaries).forEach(sum => window.applyPayrollPeriodCaps(sum));
-            return { period, through, summaries:Object.values(summaries), pending, generatedAt:new Date() };
+            return { period, through, summaries:Object.values(summaries), pending, warnings:[...reportWarnings], generatedAt:new Date() };
         };
 
         window.renderPayrollReport = function(report) {
@@ -2403,6 +2516,7 @@
                 deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
                 requiredChecklistCount:0,checkedChecklistCount:0,missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,details:[]
             };
+            const reportWarnings = new Set();
             let cursor = new Date(period.start);
             while (cursor <= through) {
                 const dateObj = new Date(cursor); dateObj.setHours(12,0,0,0);
@@ -2414,24 +2528,32 @@
                 ]);
                 const st = stateSnap.exists() ? (stateSnap.data()||{}) : {};
                 const sched = generateSchedule(prayers,dateObj.getDay());
+                let dayCoveredRanges=[];
                 for (const task of sched) {
                     if (task.noCheck || (task.noCheckOn&&task.noCheckOn.includes(dateObj.getDay()))) continue;
-                    if (window.isUserOffForPayrollTask(localDevUid,task,dateObj,name,overrideData)) continue;
+                    const payrollDur = window.getPayrollEffectiveTaskDuration({
+                        uid:localDevUid,name,task,dateObj,overrideData,coveredRanges:dayCoveredRanges
+                    });
+                    if(!payrollDur.required) continue;
+                    if(payrollDur.validInterval && payrollDur.ranges.length){
+                        dayCoveredRanges = window.mergePayrollMinuteRanges([...dayCoveredRanges, ...payrollDur.ranges]);
+                    }
+                    if(!payrollDur.validInterval) {
+                        reportWarnings.add(`${dateKey}: interval tidak valid — ${task.title} (${task.start}–${task.end}); durasi payroll dibuat 0 menit.`);
+                    } else if(payrollDur.overlappedMinutes>0) {
+                        reportWarnings.add(`${dateKey}: overlap ${payrollDur.overlappedMinutes} menit pada ${task.title}; menit overlap tidak dihitung dua kali.`);
+                    }
                     const checked = !!(st.checklist&&st.checklist[task.id]);
                     if (checked) {
                         sum.requiredChecklistCount++;
                         sum.checkedChecklistCount++;
                         continue;
                     }
-                    if (dateKey === window.getYYYYMMDD()) {
-                        const nowForTask = new Date();
-                        const endForTask = parseTime(task.end, nowForTask);
-                        if (nowForTask < endForTask) continue;
-                    }
+                    if (!window.getPayrollTaskClosedForDate(task, dateKey)) continue;
                     sum.requiredChecklistCount++;
                     sum.missedChecklistCount++;
                     const reason = st.missedReasons&&(st.missedReasons[task.id]||st.missedReasons[String(task.id)]);
-                    const ev = window.getPayrollTaskEvaluation({uid:localDevUid,name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true});
+                    const ev = window.getPayrollTaskEvaluation({uid:localDevUid,name,task,missedReason:reason,isChecked:false,isLeave:false,ended:true,durationMinutesOverride:payrollDur.minutes});
                     if (ev.status === 'Tidak Dikerjakan') {
                         sum.deductionNoCheck += ev.noCheckDeduction;
                         sum.deductionWork += ev.workDeduction;
@@ -2449,12 +2571,17 @@
                         sum.pendingPotential += ev.pendingPotential;
                         sum.pendingCount++;
                     }
-                    sum.details.push({dateKey,taskTitle:task.title,start:task.start,end:task.end,status:ev.status,deduction:ev.deduction,pendingPotential:ev.pendingPotential,reason});
+                    sum.details.push({
+                        dateKey,taskId:task.id,taskTitle:task.title,start:task.start,end:task.end,status:ev.status,
+                        deduction:ev.deduction,noCheckDeduction:ev.noCheckDeduction||0,workDeduction:ev.workDeduction||0,
+                        pendingPotential:ev.pendingPotential,lostMinutes:ev.lostMinutes,durationMinutes:ev.durationMinutes,
+                        maximumDeduction:ev.maximumDeduction,intervalValid:payrollDur.validInterval,overlappedMinutes:payrollDur.overlappedMinutes||0,reason
+                    });
                 }
                 cursor.setDate(cursor.getDate()+1);
             }
             window.applyPayrollPeriodCaps(sum);
-            return { period, through, summary:sum, generatedAt:new Date() };
+            return { period, through, summary:sum, warnings:[...reportWarnings], generatedAt:new Date() };
         };
 
         window.renderMyPayrollReport = function(report) {
@@ -2465,8 +2592,33 @@
             if (periodEl) periodEl.textContent = `Periode ${window.formatPayrollPeriodLabel(p)} • data s.d. ${window.formatDateIndo(report.through)}`;
             const box = document.getElementById('musyrifPayrollSummary');
             if (!box) return;
+
             const checklistPct = s.requiredChecklistCount > 0 ? Math.round((s.checkedChecklistCount / s.requiredChecklistCount) * 100) : 0;
+            const net = s.baseSalary > 0 ? Math.max(0, s.baseSalary - s.totalDeduction) : null;
+            const periodClosed = p.boundaryEnd <= new Date();
+            const finalStatus = s.pendingCount
+                ? '<span class="text-[8px] font-black text-violet-700 bg-violet-100 px-2 py-1 rounded-lg">BELUM FINAL</span>'
+                : (periodClosed
+                    ? '<span class="text-[8px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg">FINAL</span>'
+                    : '<span class="text-[8px] font-black text-blue-700 bg-blue-100 px-2 py-1 rounded-lg">SEMENTARA</span>');
+
             box.innerHTML = `
+                <div class="rounded-2xl border border-slate-100 bg-white/70 p-3.5 mb-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <div class="text-[10px] font-black text-blue-950">Ringkasan Gaji</div>
+                                ${finalStatus}
+                            </div>
+                            <div class="text-[8px] font-bold text-slate-400 mt-1">${window.formatRupiah(s.hourlyRate)}/jam • ${s.baseSalary > 0 ? 'Gaji pokok ' + window.formatRupiah(s.baseSalary) : 'Gaji pokok belum diatur'}</div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="text-[8px] font-black text-slate-400 uppercase">Total Potongan Final</div>
+                            <div class="text-[17px] font-black text-rose-600 mt-0.5">${window.formatRupiah(s.totalDeduction)}</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="rounded-2xl border border-blue-100 bg-blue-50/40 p-3 mb-3">
                     <div class="flex items-center justify-between gap-3 mb-2.5">
                         <div><div class="text-[9px] font-black text-blue-950">Aktivitas Ceklis Periode</div><div class="text-[8px] font-bold text-slate-400 mt-0.5">Tugas wajib sesuai jadwal kerja Anda</div></div>
@@ -2480,13 +2632,40 @@
                     <div class="h-1.5 rounded-full bg-blue-100 overflow-hidden mt-2.5"><div class="h-full bg-blue-600 rounded-full" style="width:${Math.max(0,Math.min(100,checklistPct))}%"></div></div>
                     <div class="text-[8px] font-bold text-slate-500 mt-2">Dari ${s.missedChecklistCount} tugas yang tidak diceklis: <span class="text-rose-600">${s.notDoneCount} tidak dikerjakan</span> • <span class="text-amber-600">${s.workedWithoutCheckCount} dikerjakan tetapi lupa ceklis</span> • <span class="text-emerald-600">${s.validCount} uzur valid</span> • <span class="text-violet-600">${s.pendingCount} menunggu validasi</span>.</div>
                 </div>
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-lg font-black text-rose-800 mt-1">${s.notDoneCount} tugas</div><div class="text-[8px] font-bold text-rose-500">${(s.lostMinutes/60).toFixed(2)} jam • potongan ${window.formatRupiah(s.deductionWork)}</div></div>
-                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3"><div class="text-[8px] font-black text-amber-600 uppercase">Dikerjakan, Lupa Ceklis</div><div class="text-lg font-black text-amber-800 mt-1">${s.workedWithoutCheckCount} tugas</div><div class="text-[8px] font-bold text-amber-500">Denda ${window.formatRupiah(s.deductionNoCheck)}</div></div>
-                    <div class="bg-violet-50 border border-violet-100 rounded-xl p-3"><div class="text-[8px] font-black text-violet-600 uppercase">Menunggu Validasi</div><div class="text-lg font-black text-violet-800 mt-1">${s.pendingCount} tugas</div><div class="text-[8px] font-bold text-violet-500">Potensi maks. ${window.formatRupiah(s.pendingPotential)}</div></div>
-                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3"><div class="text-[8px] font-black text-emerald-600 uppercase">Total Potongan Final</div><div class="text-[15px] font-black text-emerald-800 mt-1">${window.formatRupiah(s.totalDeduction)}</div><div class="text-[8px] font-bold text-emerald-600/80 mt-1">${s.validCount} uzur valid • Rp0</div></div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                        <div class="text-[8px] font-black text-amber-600 uppercase">Lupa Ceklis</div>
+                        <div class="text-[13px] font-black text-amber-800 mt-1">${window.formatRupiah(s.deductionNoCheck)}</div>
+                        <div class="text-[8px] font-bold text-amber-600/80 mt-1">${s.workedWithoutCheckCount} tugas dikerjakan</div>
+                    </div>
+                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3">
+                        <div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div>
+                        <div class="text-[13px] font-black text-rose-800 mt-1">${window.formatRupiah(s.deductionWork)}</div>
+                        <div class="text-[8px] font-bold text-rose-600/80 mt-1">${s.notDoneCount} tugas • ${(s.lostMinutes/60).toFixed(2)} jam</div>
+                    </div>
+                    <div class="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                        <div class="text-[8px] font-black text-violet-600 uppercase">Potensi Ditahan</div>
+                        <div class="text-[13px] font-black text-violet-800 mt-1">${window.formatRupiah(s.pendingPotential)}</div>
+                        <div class="text-[8px] font-bold text-violet-600/80 mt-1">${s.pendingCount} menunggu validasi</div>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <div class="text-[8px] font-black text-slate-500 uppercase">Jam Tidak Dikerjakan</div>
+                        <div class="text-[13px] font-black text-slate-700 mt-1">${(s.lostMinutes/60).toFixed(2)} jam</div>
+                        <div class="text-[8px] font-bold text-slate-400 mt-1">maks. ${Number(s.maxWorkHours || window.PAYROLL_DEFAULT_WORK_HOURS).toFixed(2)} jam</div>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 col-span-2">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-[8px] font-black text-emerald-600 uppercase">Gaji Bersih</div>
+                                <div class="text-[8px] font-bold text-emerald-600/80 mt-1">setelah potongan final</div>
+                            </div>
+                            <div class="text-[17px] font-black text-emerald-800">${net === null ? '—' : window.formatRupiah(net)}</div>
+                        </div>
+                    </div>
                 </div>
-                ${(s.wasHoursCapped || s.wasAmountCapped) ? `<div class="mt-2 text-[8px] font-bold text-amber-600">Jam/potongan telah dibatasi maksimal sesuai jam kerja periode.</div>` : ''}`;
+
+                ${(s.wasHoursCapped || s.wasAmountCapped) ? `<div class="mt-2 text-[8px] font-bold text-amber-600">Potongan dibatasi maksimum ${Number(s.maxWorkHours || window.PAYROLL_DEFAULT_WORK_HOURS).toFixed(2)} jam / ${Number.isFinite(s.maxPayrollDeduction) ? window.formatRupiah(s.maxPayrollDeduction) : 'batas gaji periode'}.</div>` : ''}`;
         };
 
         window.loadMyPayrollDashboard = async function(force=false) {
@@ -3738,8 +3917,8 @@
                     { id: 7, start: addMins(p.dzuhur, -10), end: p.dzuhur, title: 'Persiapan Salat Zuhur', keterangan: 'Hentikan aktivitas bebas. Mandi/bersih diri dan ke masjid 10 menit sebelum azan. Asrama dikunci.' },
                     { id: 8, start: p.dzuhur, end: addMins(p.dzuhur, 40), title: 'Salat Zuhur Berjemaah', keterangan: 'Mengarahkan santri ke masjid untuk salat Zuhur berjemaah.' },
                     { id: 9, start: addMins(p.dzuhur, 40), end: '15:00', title: 'Istirahat & Makan Siang', keterangan: 'Waktu bebas hingga persiapan salat Asar.', noCheck: true },
-                    { id: 10, start: '15:00', end: '15:10', title: 'Persiapan ke Masjid', keterangan: 'Pukul 15.10 harus sudah di masjid. Asrama dikunci.' },
-                    { id: 11, start: '15:10', end: p.ashar, title: 'Wudu & Tahiyatul Masjid', keterangan: 'Libur halakah sore, tidak ada persiapan hafalan. Saf terisi tertib.' },
+                    { id: 10, start: addMins(p.ashar, -30), end: addMins(p.ashar, -20), title: 'Persiapan ke Masjid', keterangan: 'Dimulai 30 menit sebelum azan Asar. Dalam 10 menit santri diarahkan menuju masjid dan asrama dikunci.' },
+                    { id: 11, start: addMins(p.ashar, -20), end: p.ashar, title: 'Wudu & Tahiyatul Masjid', keterangan: 'Dua puluh menit sebelum azan Asar digunakan untuk wudu dan Tahiyatul Masjid. Libur halakah sore, tidak ada persiapan hafalan. Saf terisi tertib.' },
                     { id: 12, start: p.ashar, end: addMins(p.ashar, 25), title: 'Salat Asar & Zikir Petang', keterangan: 'Jarak Azan-Ikamah 10 menit. Penuhi saf awal.' },
                     { id: 13, start: addMins(p.ashar, 25), end: '17:35', title: 'Mengawasi Kegiatan Sore', keterangan: 'Jika ada kajian bakda Asar, santri diarahkan ikut. Selebihnya bebas. Pantau batas wilayah.' },
                     { id: 16, start: '17:35', end: '17:55', title: 'Makan, Piket & Mandi', keterangan: 'Makan dengan adab dan mandi segera sebelum Magrib.' },
@@ -3756,8 +3935,8 @@
                     { id: 7, start: '07:00', end: '07:10', title: 'Persiapan Muhadatsah', keterangan: 'Pastikan perlengkapan sekolah dibawa agar tidak kembali ke asrama saat KBM.' },
                     { id: 8, start: '07:10', end: '07:20', title: 'Mendampingi Muhadatsah', keterangan: 'Pastikan santri aktif muhadatsah. Pukul 07.20 langsung masuk kelas.' },
                     { id: 9, start: '07:20', end: '15:00', title: 'Istirahat (Pagi - Siang)', keterangan: 'Waktu istirahat santri dan musyrif.', noCheck: true },
-                    { id: 10, start: '15:00', end: '15:10', title: 'Persiapan ke Masjid', keterangan: 'Pukul 15.10 harus sudah di masjid. Asrama dikunci.' },
-                    { id: 11, start: '15:10', end: p.ashar, title: 'Wudu & Tahiyatul Masjid', keterangan: 'Libur halakah sore, tidak ada persiapan hafalan.' },
+                    { id: 10, start: addMins(p.ashar, -30), end: addMins(p.ashar, -20), title: 'Persiapan ke Masjid', keterangan: 'Dimulai 30 menit sebelum azan Asar. Dalam 10 menit santri diarahkan menuju masjid dan asrama dikunci.' },
+                    { id: 11, start: addMins(p.ashar, -20), end: p.ashar, title: 'Wudu & Tahiyatul Masjid', keterangan: 'Dua puluh menit sebelum azan Asar digunakan untuk wudu dan Tahiyatul Masjid. Libur halakah sore, tidak ada persiapan hafalan.' },
                     { id: 12, start: p.ashar, end: addMins(p.ashar, 25), title: 'Salat Asar & Zikir Petang', keterangan: 'Jarak Azan-Ikamah 10 menit. Penuhi saf awal.' },
                     { id: 13, start: addMins(p.ashar, 25), end: '17:35', title: 'Mengawasi Kegiatan Sore', keterangan: 'Santri boleh olahraga, mencuci, atau bersantai. Pantau agar tidak keluar wilayah.' },
                     { id: 16, start: '17:35', end: '17:55', title: 'Makan, Piket & Mandi', keterangan: 'Makan dengan adab dan mandi segera sebelum Magrib.' },
@@ -3774,8 +3953,8 @@
                     { id: 7, start: '07:00', end: '07:10', title: 'Persiapan Muhadatsah', keterangan: 'Pastikan perlengkapan sekolah dibawa agar tidak kembali ke asrama saat KBM.' },
                     { id: 8, start: '07:10', end: '07:20', title: 'Mendampingi Muhadatsah', keterangan: 'Pastikan santri aktif muhadatsah. Pukul 07.20 langsung masuk kelas.' },
                     { id: 9, start: '07:20', end: '15:00', title: 'Istirahat (Waktu KBM)', keterangan: 'Kegiatan Belajar Mengajar berlangsung.', noCheck: true },
-                    { id: 10, start: '15:00', end: '15:10', title: 'Persiapan ke Masjid', keterangan: 'Pukul 15.10 harus sudah di masjid. Asrama dikunci.' },
-                    { id: 11, start: '15:10', end: p.ashar, title: 'Wudu & Tahiyatul Masjid', keterangan: 'Persiapan wudu dan saf masjid.' },
+                    { id: 10, start: addMins(p.ashar, -30), end: addMins(p.ashar, -20), title: 'Persiapan ke Masjid', keterangan: 'Dimulai 30 menit sebelum azan Asar. Dalam 10 menit santri diarahkan menuju masjid dan asrama dikunci.' },
+                    { id: 11, start: addMins(p.ashar, -20), end: p.ashar, title: 'Wudu & Tahiyatul Masjid', keterangan: 'Dua puluh menit sebelum azan Asar digunakan untuk wudu, Tahiyatul Masjid, dan penataan saf.' },
                     { id: 12, start: p.ashar, end: addMins(p.ashar, 25), title: 'Salat Asar & Zikir Petang', keterangan: 'Jarak Azan-Ikamah 10 menit. Penuhi saf awal.' },
                     { id: 13, start: addMins(p.ashar, 25), end: addMins(p.ashar, 45), title: 'Membaca Al-Qur\'an', keterangan: 'Membaca secara sirr/lirih.' },
                     { id: 14, start: addMins(p.ashar, 45), end: '16:55', title: 'Mengampu Halakah', keterangan: 'Fokus setoran hafalan.', noCheckOn: [2, 4] },
