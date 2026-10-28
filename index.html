@@ -1743,6 +1743,19 @@
             return window.payrollConfig;
         };
 
+        window.previewPayrollPeriodRate = function(uid, inputEl) {
+            const rateBox = document.querySelector(`[data-payroll-rate-display="${uid}"]`);
+            if (!rateBox) return;
+            const reportSum = window.payrollLastReport?.summaries?.find(x=>x.uid===uid);
+            const workMinutes = Math.max(0, Number(reportSum?.periodWorkMinutes) || 0);
+            const baseSalary = Math.max(0, window.parseRupiahInput(inputEl?.value));
+            const hourlyRate = window.getPayrollPeriodHourlyRate(baseSalary, workMinutes);
+            const main = rateBox.querySelector('[data-payroll-rate-main]');
+            const sub = rateBox.querySelector('[data-payroll-rate-sub]');
+            if (main) main.textContent = hourlyRate > 0 ? `${window.formatRupiah(Math.round(hourlyRate))}/jam` : 'Dihitung otomatis';
+            if (sub) sub.textContent = workMinutes > 0 ? `${(workMinutes/60).toFixed(2)} jam kerja periode` : 'berdasarkan jam kerja resmi periode';
+        };
+
         window.renderPayrollConfigUI = function() {
             const box = document.getElementById('payrollConfigUsers');
             const penalty = document.getElementById('payrollForgotPenalty');
@@ -1756,18 +1769,58 @@
             box.innerHTML = users.map(m => {
                 const cfg = window.getPayrollUserConfig(m.id, m.name);
                 const reportSum = window.payrollLastReport?.summaries?.find(x=>x.uid===m.id);
-                const rateText = reportSum && Number(reportSum.hourlyRate) > 0
-                    ? `${window.formatRupiah(Math.round(reportSum.hourlyRate))}/jam`
+                // Untuk periode lampau, input harus menampilkan gaji pokok yang benar-benar dipakai
+                // snapshot periode tersebut, bukan nilai default/global terbaru.
+                const displayedBaseSalary = reportSum && Number.isFinite(Number(reportSum.baseSalary))
+                    ? Math.max(0, Number(reportSum.baseSalary) || 0)
+                    : Math.max(0, Number(cfg.baseSalary) || 0);
+                const liveRate = reportSum && Number(reportSum.periodWorkMinutes) > 0
+                    ? window.getPayrollPeriodHourlyRate(displayedBaseSalary, Number(reportSum.periodWorkMinutes))
+                    : 0;
+                const rateText = liveRate > 0
+                    ? `${window.formatRupiah(Math.round(liveRate))}/jam`
                     : 'Dihitung otomatis';
                 const hoursText = reportSum && Number(reportSum.periodWorkMinutes) > 0
                     ? `${(reportSum.periodWorkMinutes/60).toFixed(2)} jam kerja periode`
                     : 'berdasarkan jam kerja resmi periode';
                 return `<div class="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_180px_190px] gap-2 items-center bg-slate-50/70 border border-slate-100 rounded-2xl p-3">
                     <div class="min-w-0"><div class="text-[11px] font-black text-blue-950">${window.escapeHtml(m.name || 'Musyrif')}</div><div class="text-[9px] font-semibold text-slate-400 truncate">${window.escapeHtml(m.email || '')}</div></div>
-                    <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji / Jam Periode</label><div data-payroll-rate-display="${m.id}" class="w-full text-[10px] font-bold p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-blue-800"><div>${rateText}</div><div class="text-[8px] text-slate-400 mt-0.5">${hoursText}</div></div></div>
-                    <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji Pokok Periode</label><input data-payroll-base="${m.id}" type="text" inputmode="numeric" value="${window.formatRupiah(cfg.baseSalary)}" onfocus="unformatMoneyInput(this)" onblur="formatMoneyInput(this)" class="w-full text-[10px] font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-300"></div>
+                    <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji / Jam Periode</label><div data-payroll-rate-display="${m.id}" class="w-full text-[10px] font-bold p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-blue-800"><div data-payroll-rate-main>${rateText}</div><div data-payroll-rate-sub class="text-[8px] text-slate-400 mt-0.5">${hoursText}</div></div></div>
+                    <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji Pokok Periode</label><input data-payroll-base="${m.id}" type="text" inputmode="numeric" value="${window.formatRupiah(displayedBaseSalary)}" onfocus="unformatMoneyInput(this)" oninput="previewPayrollPeriodRate('${m.id}',this)" onblur="formatMoneyInput(this);previewPayrollPeriodRate('${m.id}',this)" class="w-full text-[10px] font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-300"></div>
                 </div>`;
             }).join('');
+        };
+
+        window.updateClosedPayrollPeriodSalaryBasis = async function(period, users) {
+            if (!period?.monthValue || period.boundaryEnd > new Date()) return false;
+            const ref = doc(db,'artifacts',appId,'public','data','payroll_period_basis',period.monthValue);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return false;
+            const data = snap.data() || {};
+            if (data.calculationModel !== 'base_salary_divided_by_official_work_hours_v3' || !data.users || typeof data.users !== 'object') return false;
+
+            const nextUsers = { ...data.users };
+            for (const [uid, cfg] of Object.entries(users || {})) {
+                const old = nextUsers[uid];
+                if (!old) continue;
+                const workMinutes = Math.max(0, Number(old.workMinutes) || 0);
+                const baseSalary = Math.max(0, Number(cfg.baseSalary) || 0);
+                nextUsers[uid] = {
+                    ...old,
+                    baseSalary,
+                    hourlyRate: window.getPayrollPeriodHourlyRate(baseSalary, workMinutes)
+                };
+            }
+
+            await setDoc(ref, {
+                ...data,
+                users: nextUsers,
+                calculationModel:'base_salary_divided_by_official_work_hours_v3',
+                salaryAdjustedAt: serverTimestamp(),
+                salaryAdjustedBy: localDevUid || ''
+            }, { merge:false });
+            delete window.payrollPeriodBasisCache?.[period.monthValue];
+            return true;
         };
 
         window.savePayrollConfig = async function() {
@@ -1789,10 +1842,18 @@
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'payroll_config'), {
                     flatForgotPenalty, users, calculationModel:'base_salary_divided_by_official_work_hours_v3', updatedAt: serverTimestamp(), updatedBy: localDevUid || ''
                 }, { merge: true });
-                await window.logActivity('payroll', 'Memperbarui gaji pokok dan denda lupa ceklis. Tarif per jam dihitung otomatis dari jam kerja resmi periode.', { flatForgotPenalty });
-                showToast('Pengaturan payroll berhasil disimpan.', 'success');
+
+                // Jika Pimpinan sedang mengoreksi periode yang sudah ditutup, jam kerja historis
+                // tetap dibekukan, tetapi gaji pokok + tarif/jam periode tersebut harus ikut berubah.
+                const selectedMonth = document.getElementById('payrollPeriodMonth')?.value || window.getPayrollPeriod('').monthValue;
+                const selectedPeriod = window.getPayrollPeriod(selectedMonth);
+                const historicalUpdated = await window.updateClosedPayrollPeriodSalaryBasis(selectedPeriod, users);
+
+                await window.logActivity('payroll', 'Memperbarui gaji pokok dan denda lupa ceklis. Tarif per jam dihitung otomatis dari jam kerja resmi periode.', { flatForgotPenalty, period:selectedPeriod.monthValue, historicalUpdated });
+                showToast(historicalUpdated ? 'Gaji pokok periode dan tarif/jam berhasil diperbarui.' : 'Pengaturan payroll berhasil disimpan.', 'success');
                 window.payrollLastReport = null;
                 window.musyrifPayrollLastReport = null;
+                delete window.payrollPeriodBasisCache?.[selectedPeriod.monthValue];
                 await window.loadPayrollDashboard(true);
             } catch(e) {
                 console.error('Save payroll config:', e);
