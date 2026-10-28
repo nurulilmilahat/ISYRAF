@@ -531,7 +531,7 @@
                     <div id="musyrifPayrollSummary" class="text-[10px] font-bold text-slate-400 py-3">
                         <i class="fas fa-circle-notch fa-spin mr-1.5"></i> Menyiapkan rekap potongan...
                     </div>
-                    <div class="mt-3 text-[9px] font-bold text-slate-400 leading-relaxed"><i class="fas fa-circle-info mr-1"></i> Jika tugas tidak diceklis dan tidak ada alasan, sistem menganggap tugas tidak dikerjakan. Potongan tidak dikerjakan dihitung dari durasi tugas × gaji per jam periode. Gaji per jam periode dihitung otomatis dari gaji pokok ÷ total jam tugas wajib efektif. Rp1.000 hanya berlaku jika Pimpinan memastikan tugas sebenarnya dikerjakan tetapi lupa diceklis.</div>
+                    <div class="mt-3 text-[9px] font-bold text-slate-400 leading-relaxed"><i class="fas fa-circle-info mr-1"></i> Jika tugas tidak diceklis dan tidak ada alasan, sistem menganggap tugas tidak dikerjakan. Potongan tidak dikerjakan dihitung dari durasi tugas × gaji per jam periode. Gaji per jam periode dihitung otomatis dari gaji pokok ÷ total jam kerja resmi periode. Rp1.000 hanya berlaku jika Pimpinan memastikan tugas sebenarnya dikerjakan tetapi lupa diceklis.</div>
                 </div>
 
                 <!-- PENGINGAT JADWAL ABSENSI -->
@@ -861,7 +861,7 @@
                     <div class="flex items-start justify-between gap-3 mb-4">
                         <div>
                             <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-scale-balanced mr-2 text-amber-500"></i> Aturan Potongan</h3>
-                            <p class="text-[10px] font-bold text-slate-400 mt-1">Jika tugas tidak diceklis, sistem menganggap tugas tidak dikerjakan. Potongan tugas dihitung dari durasi yang tidak dikerjakan × gaji per jam periode. Gaji per jam periode dihitung otomatis dari gaji pokok ÷ total jam tugas wajib efektif pada periode 26–25. Rp1.000 hanya menjadi denda tersendiri bila Pimpinan memastikan tugas sebenarnya dikerjakan tetapi lupa diceklis. Alasan menangguhkan potongan sampai divalidasi Pimpinan.</p>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Jika tugas tidak diceklis, sistem menganggap tugas tidak dikerjakan. Potongan tugas dihitung dari durasi yang tidak dikerjakan × gaji per jam periode. Gaji per jam periode dihitung otomatis dari gaji pokok ÷ total jam kerja resmi pada periode 26–25. Rp1.000 hanya menjadi denda tersendiri bila Pimpinan memastikan tugas sebenarnya dikerjakan tetapi lupa diceklis. Alasan menangguhkan potongan sampai divalidasi Pimpinan.</p>
                         </div>
                         <span id="payrollPeriodBadge" class="text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg whitespace-nowrap">26 → 26</span>
                     </div>
@@ -877,7 +877,7 @@
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
                             <h3 class="text-[13px] font-extrabold text-blue-950 flex items-center"><i class="fas fa-sliders mr-2 text-blue-500"></i> Pengaturan Gaji</h3>
-                            <p class="text-[10px] font-bold text-slate-400 mt-1">Pimpinan cukup mengisi gaji pokok. Gaji per jam dihitung otomatis untuk setiap periode dari gaji pokok ÷ total jam tugas wajib efektif pada periode tersebut.</p>
+                            <p class="text-[10px] font-bold text-slate-400 mt-1">Pimpinan cukup mengisi gaji pokok. Gaji per jam dihitung otomatis untuk setiap periode dari gaji pokok ÷ total jam kerja resmi pada periode tersebut.</p>
                         </div>
                         <button onclick="savePayrollConfig()" class="text-[10px] font-extrabold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-2 rounded-xl hover:bg-blue-100 transition"><i class="fas fa-save mr-1"></i> Simpan</button>
                     </div>
@@ -1597,30 +1597,36 @@
         };
 
 
-        // Model payroll berbasis gaji pokok per periode.
-        // Tarif/jam TIDAK lagi menjadi angka tetap. Tarif dihitung otomatis:
-        // gaji pokok ÷ total jam tugas wajib efektif pada periode 26–25.
-        // Dengan model ini, bila seluruh jam tugas wajib tidak dikerjakan,
-        // potongan tidak-dikerjakan tepat sama dengan gaji pokok.
-        window.PAYROLL_DEFAULT_WORK_HOURS = 0; // kompatibilitas lama; tidak lagi menjadi dasar payroll.
+        // MODEL PAYROLL FINAL:
+        // 1) Gaji/jam periode = gaji pokok ÷ total JAM KERJA RESMI periode 26–25.
+        //    Jam kerja resmi: 03.50–07.20 (3,5 jam) + 15.00–22.00 (7 jam),
+        //    lalu dikurangi interval libur/override masing-masing musyrif.
+        // 2) Potongan "Tidak Dikerjakan" tetap berdasarkan DURASI TUGAS aktual × tarif/jam periode.
+        //    Karena waktu istirahat/jeda tidak menjadi tugas ceklis, jika semua tugas terlewat
+        //    masih mungkin tersisa sebagian gaji. Ini disengaja dan sesuai kebijakan payroll.
+        window.PAYROLL_OFFICIAL_WORK_RANGES = Object.freeze([
+            { start: 230, end: 440 },   // 03.50–07.20 = 210 menit
+            { start: 900, end: 1320 }   // 15.00–22.00 = 420 menit
+        ]);
+        window.PAYROLL_FULL_DUTY_MINUTES = 630; // 10,5 jam/hari
 
-        window.getPayrollPeriodHourlyRate = function(baseSalary, requiredMinutes) {
+        window.getPayrollPeriodHourlyRate = function(baseSalary, workMinutes) {
             const base = Math.max(0, Number(baseSalary) || 0);
-            const mins = Math.max(0, Number(requiredMinutes) || 0);
+            const mins = Math.max(0, Number(workMinutes) || 0);
             return base > 0 && mins > 0 ? base / (mins / 60) : 0;
         };
 
         window.applyPayrollPeriodCaps = function(sum) {
             if (!sum) return sum;
             const baseSalary = Math.max(0, Number(sum.baseSalary) || 0);
-            const requiredMinutes = Math.max(0, Math.round(Number(sum.periodRequiredMinutes) || 0));
-            const hourlyRate = window.getPayrollPeriodHourlyRate(baseSalary, requiredMinutes);
+            const workMinutes = Math.max(0, Math.round(Number(sum.periodWorkMinutes ?? sum.periodRequiredMinutes) || 0));
+            const hourlyRate = window.getPayrollPeriodHourlyRate(baseSalary, workMinutes);
             const forgotPenalty = Math.max(0, Number(window.payrollConfig?.flatForgotPenalty) || 1000);
             const maxAmount = baseSalary > 0 ? Math.round(baseSalary) : Number.POSITIVE_INFINITY;
 
             sum.hourlyRate = hourlyRate;
-            sum.maxWorkMinutes = requiredMinutes;
-            sum.maxWorkHours = requiredMinutes / 60;
+            sum.maxWorkMinutes = workMinutes;
+            sum.maxWorkHours = workMinutes / 60;
             sum.maxPayrollDeduction = maxAmount;
 
             const details = Array.isArray(sum.details) ? sum.details : [];
@@ -1628,8 +1634,9 @@
             sum.rawDeductionNoCheck = details.reduce((n,d)=>n + (d.status === 'Tidak Ceklis — Tugas Dikerjakan' ? Math.max(0, Number(d.noCheckDeduction) || forgotPenalty) : 0), 0);
             sum.rawPendingPotential = details.reduce((n,d)=>n + (d.status === 'Menunggu Validasi Pimpinan' ? Math.max(0, Number(d.pendingPotential) || 0) : 0), 0);
 
-            // 1) Potongan tidak dikerjakan. Jam tidak boleh melebihi total jam tugas wajib periode.
-            let remainingMinutes = requiredMinutes;
+            // 1) Potongan tidak dikerjakan memakai durasi tugas aktual × tarif/jam periode.
+            // Pengaman: total menit potongan tidak boleh melebihi total jam kerja resmi periode.
+            let remainingMinutes = workMinutes;
             let appliedLostMinutes = 0;
             const workDetails = [];
             for (const d of details) {
@@ -1713,7 +1720,7 @@
             sum.totalDeduction = targetWorkDeduction + appliedNoCheck;
             if (Number.isFinite(maxAmount)) sum.totalDeduction = Math.min(sum.totalDeduction, maxAmount);
             sum.pendingPotential = appliedPending;
-            sum.wasHoursCapped = sum.rawLostMinutes > requiredMinutes;
+            sum.wasHoursCapped = sum.rawLostMinutes > workMinutes;
             sum.wasAmountCapped = Number.isFinite(maxAmount) && (targetWorkDeduction + sum.rawDeductionNoCheck) > maxAmount;
             return sum;
         };
@@ -1752,9 +1759,9 @@
                 const rateText = reportSum && Number(reportSum.hourlyRate) > 0
                     ? `${window.formatRupiah(Math.round(reportSum.hourlyRate))}/jam`
                     : 'Dihitung otomatis';
-                const hoursText = reportSum && Number(reportSum.periodRequiredMinutes) > 0
-                    ? `${(reportSum.periodRequiredMinutes/60).toFixed(2)} jam tugas periode`
-                    : 'berdasarkan periode yang dipilih';
+                const hoursText = reportSum && Number(reportSum.periodWorkMinutes) > 0
+                    ? `${(reportSum.periodWorkMinutes/60).toFixed(2)} jam kerja periode`
+                    : 'berdasarkan jam kerja resmi periode';
                 return `<div class="grid grid-cols-1 md:grid-cols-[minmax(180px,1fr)_180px_190px] gap-2 items-center bg-slate-50/70 border border-slate-100 rounded-2xl p-3">
                     <div class="min-w-0"><div class="text-[11px] font-black text-blue-950">${window.escapeHtml(m.name || 'Musyrif')}</div><div class="text-[9px] font-semibold text-slate-400 truncate">${window.escapeHtml(m.email || '')}</div></div>
                     <div><label class="block text-[8px] font-black uppercase text-slate-400 mb-1">Gaji / Jam Periode</label><div data-payroll-rate-display="${m.id}" class="w-full text-[10px] font-bold p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-blue-800"><div>${rateText}</div><div class="text-[8px] text-slate-400 mt-0.5">${hoursText}</div></div></div>
@@ -1780,9 +1787,9 @@
             window.payrollConfig = { flatForgotPenalty, users };
             try {
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'payroll_config'), {
-                    flatForgotPenalty, users, calculationModel:'base_salary_divided_by_period_required_hours_v2', updatedAt: serverTimestamp(), updatedBy: localDevUid || ''
+                    flatForgotPenalty, users, calculationModel:'base_salary_divided_by_official_work_hours_v3', updatedAt: serverTimestamp(), updatedBy: localDevUid || ''
                 }, { merge: true });
-                await window.logActivity('payroll', 'Memperbarui gaji pokok dan denda lupa ceklis. Tarif per jam dihitung otomatis per periode.', { flatForgotPenalty });
+                await window.logActivity('payroll', 'Memperbarui gaji pokok dan denda lupa ceklis. Tarif per jam dihitung otomatis dari jam kerja resmi periode.', { flatForgotPenalty });
                 showToast('Pengaturan payroll berhasil disimpan.', 'success');
                 window.payrollLastReport = null;
                 window.musyrifPayrollLastReport = null;
@@ -2163,6 +2170,16 @@
             return result.filter(r=>r.end>r.start);
         };
 
+        // Menghitung JAM KERJA RESMI yang benar-benar menjadi dasar tarif/jam pada satu tanggal.
+        // Full duty = 630 menit. Libur/override mengurangi blok resmi, bukan durasi tugas.
+        window.getPayrollOfficialWorkDuration = function(uid, dateObj, name, overrideData) {
+            const official = (window.PAYROLL_OFFICIAL_WORK_RANGES || []).map(r=>({start:r.start,end:r.end}));
+            const off = window.mergePayrollMinuteRanges(window.getPayrollOffIntervals(uid, dateObj, name, overrideData));
+            const ranges = window.subtractPayrollRanges(official, off);
+            const minutes = ranges.reduce((n,r)=>n + Math.max(0, r.end-r.start), 0);
+            return { minutes, ranges, offIntervals:off };
+        };
+
         window.getPayrollEffectiveTaskDuration = function({uid, name, task, dateObj, overrideData, coveredRanges=[]}) {
             const start=window.timeToMinutes(task?.start || '');
             const end=window.timeToMinutes(task?.end || '');
@@ -2204,9 +2221,11 @@
             try {
                 const snap = await getDoc(doc(db,'artifacts',appId,'public','data','payroll_period_basis',key));
                 const data = snap.exists() ? (snap.data() || null) : null;
-                const valid = data && data.calculationModel === 'base_salary_divided_by_period_required_hours_v2' && data.users && typeof data.users === 'object';
-                window.payrollPeriodBasisCache[key] = valid ? data : null;
-                return valid ? data : null;
+                const isV3 = data && data.calculationModel === 'base_salary_divided_by_official_work_hours_v3' && data.users && typeof data.users === 'object';
+                const isLegacyV2 = data && data.calculationModel === 'base_salary_divided_by_period_required_hours_v2' && data.users && typeof data.users === 'object';
+                const result = isV3 ? data : (isLegacyV2 ? { ...data, _legacyV2:true } : null);
+                window.payrollPeriodBasisCache[key] = result;
+                return result;
             } catch(e) {
                 console.error('Read payroll period basis:', e);
                 throw new Error(`Basis payroll periode ${key} tidak dapat diverifikasi.`);
@@ -2224,7 +2243,8 @@
                 payloadUsers[m.id] = {
                     name:m.name || 'Musyrif',
                     baseSalary:Math.max(0, Number(b.baseSalary) || 0),
-                    requiredMinutes:Math.max(0, Math.round(Number(b.requiredMinutes) || 0)),
+                    workMinutes:Math.max(0, Math.round(Number(b.workMinutes) || 0)),
+                    taskMinutes:Math.max(0, Math.round(Number(b.taskMinutes) || 0)),
                     requiredTaskCount:Math.max(0, Math.round(Number(b.requiredTaskCount) || 0)),
                     hourlyRate:Number(b.hourlyRate) || 0
                 };
@@ -2233,7 +2253,7 @@
                 periodMonth:key,
                 periodStart:window.getYYYYMMDD(period.start),
                 periodEnd:window.getYYYYMMDD(period.end),
-                calculationModel:'base_salary_divided_by_period_required_hours_v2',
+                calculationModel:'base_salary_divided_by_official_work_hours_v3',
                 users:payloadUsers,
                 frozenAt:serverTimestamp(),
                 frozenBy:localDevUid || ''
@@ -2244,29 +2264,36 @@
 
         window.calculatePayrollPeriodBasis = async function(users, period, reportWarnings = new Set()) {
             const closed = period.boundaryEnd <= new Date();
+            let legacyUsers = null;
             if (closed) {
                 const stored = await window.getStoredPayrollPeriodBasis(period);
-                if (stored?.users) {
+                if (stored?.users && !stored._legacyV2) {
                     const restored = {};
                     for (const m of users) {
                         const b = stored.users[m.id];
                         if (!b) continue;
                         restored[m.id] = {
-                            requiredMinutes:Math.max(0, Number(b.requiredMinutes) || 0),
+                            workMinutes:Math.max(0, Number(b.workMinutes) || 0),
+                            taskMinutes:Math.max(0, Number(b.taskMinutes) || 0),
                             requiredTaskCount:Math.max(0, Number(b.requiredTaskCount) || 0),
                             baseSalary:Math.max(0, Number(b.baseSalary) || 0),
                             hourlyRate:Math.max(0, Number(b.hourlyRate) || 0),
                             frozen:true
                         };
                     }
-                    // Bila semua akun yang sedang ada mempunyai basis tersimpan, pakai snapshot penuh.
+                    // Bila semua akun yang sedang ada mempunyai basis V3 tersimpan, pakai snapshot penuh.
                     if (users.every(m=>restored[m.id])) return restored;
                     reportWarnings.add(`Basis periode ${period.monthValue} belum lengkap untuk semua akun; basis dihitung ulang dan dibekukan kembali.`);
+                } else if (stored?._legacyV2 && stored.users) {
+                    // Migrasi periode lama: pertahankan gaji pokok yang dahulu sudah dibekukan,
+                    // tetapi hitung ulang jam kerja resmi memakai model final.
+                    legacyUsers = stored.users;
+                    reportWarnings.add(`Basis periode ${period.monthValue} dimigrasikan ke model jam kerja resmi; gaji pokok historis dipertahankan.`);
                 }
             }
 
             const basis = {};
-            for (const m of users) basis[m.id] = { requiredMinutes:0, requiredTaskCount:0 };
+            for (const m of users) basis[m.id] = { workMinutes:0, taskMinutes:0, requiredTaskCount:0 };
             let cursor = new Date(period.start);
             while (cursor <= period.end) {
                 const dateObj = new Date(cursor); dateObj.setHours(12,0,0,0);
@@ -2277,6 +2304,11 @@
                 ]);
                 const sched = generateSchedule(prayers, dateObj.getDay());
                 for (const m of users) {
+                    // Tarif/jam menggunakan JAM KERJA RESMI, bukan penjumlahan durasi tugas.
+                    const officialWork = window.getPayrollOfficialWorkDuration(m.id, dateObj, m.name||'Musyrif', overrideData);
+                    basis[m.id].workMinutes += Math.max(0, Number(officialWork.minutes) || 0);
+
+                    // Durasi tugas tetap dihitung terpisah sebagai dasar potongan ketika tugas tidak dikerjakan.
                     let coveredRanges = [];
                     for (const task of sched) {
                         if (task.noCheck || (task.noCheckOn && task.noCheckOn.includes(dateObj.getDay()))) continue;
@@ -2286,15 +2318,16 @@
                         if (dur.validInterval && dur.ranges.length) coveredRanges = window.mergePayrollMinuteRanges([...coveredRanges, ...dur.ranges]);
                         if (!dur.validInterval) reportWarnings.add(`${dateKey}: interval tidak valid — ${task.title} (${task.start}–${task.end}); 0 menit masuk basis payroll.`);
                         if (dur.overlappedMinutes > 0) reportWarnings.add(`${dateKey}: overlap ${dur.overlappedMinutes} menit pada ${task.title}; tidak dihitung dua kali.`);
-                        basis[m.id].requiredMinutes += Math.max(0, Number(dur.minutes) || 0);
+                        basis[m.id].taskMinutes += Math.max(0, Number(dur.minutes) || 0);
                     }
                 }
                 cursor.setDate(cursor.getDate()+1);
             }
             for (const m of users) {
                 const cfg = window.getPayrollUserConfig(m.id, m.name);
-                basis[m.id].baseSalary = cfg.baseSalary;
-                basis[m.id].hourlyRate = window.getPayrollPeriodHourlyRate(cfg.baseSalary, basis[m.id].requiredMinutes);
+                const legacyBase = legacyUsers?.[m.id] ? Math.max(0, Number(legacyUsers[m.id].baseSalary) || 0) : null;
+                basis[m.id].baseSalary = legacyBase !== null ? legacyBase : cfg.baseSalary;
+                basis[m.id].hourlyRate = window.getPayrollPeriodHourlyRate(basis[m.id].baseSalary, basis[m.id].workMinutes);
                 basis[m.id].frozen = false;
             }
             if (closed && currentRole === 'admin') {
@@ -2317,10 +2350,10 @@
             const basis = await window.calculatePayrollPeriodBasis(users, period, reportWarnings);
             const summaries = {};
             users.forEach(m=>{
-                const b = basis[m.id] || {requiredMinutes:0,requiredTaskCount:0,hourlyRate:0,baseSalary:0};
+                const b = basis[m.id] || {workMinutes:0,taskMinutes:0,requiredTaskCount:0,hourlyRate:0,baseSalary:0};
                 summaries[m.id] = {
                     uid:m.id,name:m.name||'Musyrif',email:m.email||'',hourlyRate:b.hourlyRate,baseSalary:b.baseSalary,
-                    periodRequiredMinutes:b.requiredMinutes,periodRequiredTaskCount:b.requiredTaskCount,
+                    periodWorkMinutes:b.workMinutes,periodTaskMinutes:b.taskMinutes,periodRequiredMinutes:b.workMinutes,periodRequiredTaskCount:b.requiredTaskCount,
                     deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
                     requiredChecklistCount:0,checkedChecklistCount:0,missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,autoNoReasonCount:0,details:[]
                 };
@@ -2373,7 +2406,7 @@
                 cursor.setDate(cursor.getDate()+1);
             }
             Object.values(summaries).forEach(sum=>window.applyPayrollPeriodCaps(sum));
-            return { period, through, summaries:Object.values(summaries), pending, warnings:[...reportWarnings], generatedAt:new Date(), calculationModel:'base_salary_divided_by_period_required_hours_v2' };
+            return { period, through, summaries:Object.values(summaries), pending, warnings:[...reportWarnings], generatedAt:new Date(), calculationModel:'base_salary_divided_by_official_work_hours_v3' };
         };
 
         window.renderPayrollReport = function(report) {
@@ -2414,7 +2447,7 @@
                         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
                             <div>
                                 <div class="flex items-center gap-2 flex-wrap"><div class="text-[13px] font-black text-blue-950">${window.escapeHtml(s.name)}</div>${finalStatus}</div>
-                                <div class="text-[9px] font-bold text-slate-400 mt-1">${window.formatRupiah(Math.round(s.hourlyRate))}/jam periode • ${s.baseSalary>0?'Gaji pokok '+window.formatRupiah(s.baseSalary):'Gaji pokok belum diatur'} • ${(s.periodRequiredMinutes/60).toFixed(2)} jam tugas periode</div>
+                                <div class="text-[9px] font-bold text-slate-400 mt-1">${window.formatRupiah(Math.round(s.hourlyRate))}/jam periode • ${s.baseSalary>0?'Gaji pokok '+window.formatRupiah(s.baseSalary):'Gaji pokok belum diatur'} • ${(s.periodWorkMinutes/60).toFixed(2)} jam kerja periode • ${(s.periodTaskMinutes/60).toFixed(2)} jam tugas ceklis</div>
                             </div>
                             <div class="text-left lg:text-right"><div class="text-[9px] font-black text-slate-400 uppercase">Total Potongan Final</div><div class="text-xl font-black text-rose-600">${window.formatRupiah(s.totalDeduction)}</div></div>
                         </div>
@@ -2437,7 +2470,7 @@
                             <div class="bg-amber-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-amber-600 uppercase">Lupa Ceklis</div><div class="text-[11px] font-black text-amber-800 mt-0.5">${window.formatRupiah(s.deductionNoCheck)}</div><div class="text-[8px] font-bold text-amber-600/80 mt-1">${s.workedWithoutCheckCount} tugas dikerjakan</div></div>
                             <div class="bg-rose-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-rose-600 uppercase">Tidak Dikerjakan</div><div class="text-[11px] font-black text-rose-800 mt-0.5">${window.formatRupiah(s.deductionWork)}</div><div class="text-[8px] font-bold text-rose-600/80 mt-1">${s.notDoneCount} tugas • ${(s.lostMinutes/60).toFixed(2)} jam</div></div>
                             <div class="bg-violet-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-violet-600 uppercase">Potensi Ditahan</div><div class="text-[11px] font-black text-violet-800 mt-0.5">${window.formatRupiah(s.pendingPotential)}</div><div class="text-[8px] font-bold text-violet-600/80 mt-1">${s.pendingCount} menunggu validasi</div></div>
-                            <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-slate-500 uppercase">Jam Tidak Dikerjakan</div><div class="text-[11px] font-black text-slate-700 mt-0.5">${(s.lostMinutes/60).toFixed(2)} jam</div><div class="text-[8px] font-bold text-slate-400 mt-1">dari ${(Number(s.periodRequiredMinutes||0)/60).toFixed(2)} jam tugas periode</div></div>
+                            <div class="bg-slate-50 rounded-xl p-2.5"><div class="text-[8px] font-black text-slate-500 uppercase">Jam Tidak Dikerjakan</div><div class="text-[11px] font-black text-slate-700 mt-0.5">${(s.lostMinutes/60).toFixed(2)} jam</div><div class="text-[8px] font-bold text-slate-400 mt-1">dari ${(Number(s.periodWorkMinutes||0)/60).toFixed(2)} jam kerja periode</div></div>
                             <div class="bg-emerald-50 rounded-xl p-2.5 col-span-2 lg:col-span-1"><div class="text-[8px] font-black text-emerald-600 uppercase">Gaji Bersih</div><div class="text-[11px] font-black text-emerald-800 mt-0.5">${net===null?'—':window.formatRupiah(net)}</div><div class="text-[8px] font-bold text-emerald-600/80 mt-1">setelah potongan final</div></div>
                         </div>
                         ${(s.wasHoursCapped || s.wasAmountCapped) ? `<div class="text-[8px] font-bold text-amber-600 mt-2">Potongan final dibatasi maksimum sebesar gaji pokok periode: ${Number.isFinite(s.maxPayrollDeduction) ? window.formatRupiah(s.maxPayrollDeduction) : '—'}.</div>` : ''}
@@ -2480,19 +2513,19 @@
                 [`Periode: ${periodLabel}`],
                 [`Data dihitung sampai: ${window.formatDateIndo(r.through)}`],
                 [],
-                ['No','Nama Musyrif','Gaji / Jam Periode','Gaji Pokok','Jam Tugas Periode','Jumlah Tidak Ceklis','Denda Lupa Ceklis','Tugas Tidak Dikerjakan','Jam Tidak Dikerjakan','Potongan Tidak Dikerjakan','Potongan Ditahan','Pending Validasi','Total Potongan Final','Gaji Bersih','Status']
+                ['No','Nama Musyrif','Gaji / Jam Periode','Gaji Pokok','Jam Kerja Periode','Jam Tugas Ceklis Periode','Jumlah Tidak Ceklis','Denda Lupa Ceklis','Tugas Tidak Dikerjakan','Jam Tidak Dikerjakan','Potongan Tidak Dikerjakan','Potongan Ditahan','Pending Validasi','Total Potongan Final','Gaji Bersih','Status']
             ];
             r.summaries.forEach((s,i)=>{
                 const net=s.baseSalary>0?Math.max(0,s.baseSalary-s.totalDeduction):'';
-                summaryRows.push([i+1,s.name,Math.round(s.hourlyRate),s.baseSalary||'',Number((s.periodRequiredMinutes/60).toFixed(2)),s.missedChecklistCount,s.deductionNoCheck,s.notDoneCount,Number((s.lostMinutes/60).toFixed(2)),s.deductionWork,s.pendingPotential,s.pendingCount,s.totalDeduction,net,payrollStatus(s)]);
+                summaryRows.push([i+1,s.name,Math.round(s.hourlyRate),s.baseSalary||'',Number((s.periodWorkMinutes/60).toFixed(2)),Number((s.periodTaskMinutes/60).toFixed(2)),s.missedChecklistCount,s.deductionNoCheck,s.notDoneCount,Number((s.lostMinutes/60).toFixed(2)),s.deductionWork,s.pendingPotential,s.pendingCount,s.totalDeduction,net,payrollStatus(s)]);
             });
             const wsSummary=XLSX.utils.aoa_to_sheet(summaryRows);
-            wsSummary['!merges']=[{s:{r:0,c:0},e:{r:0,c:14}},{s:{r:1,c:0},e:{r:1,c:13}},{s:{r:2,c:0},e:{r:2,c:13}},{s:{r:3,c:0},e:{r:3,c:13}}];
-            wsSummary['!cols']=[{wch:5},{wch:28},{wch:14},{wch:16},{wch:18},{wch:18},{wch:22},{wch:16},{wch:20},{wch:24},{wch:18},{wch:17},{wch:20},{wch:18},{wch:14}];
-            if(summaryRows.length>6) wsSummary['!autofilter']={ref:`A6:O${summaryRows.length}`};
+            wsSummary['!merges']=[{s:{r:0,c:0},e:{r:0,c:15}},{s:{r:1,c:0},e:{r:1,c:15}},{s:{r:2,c:0},e:{r:2,c:15}},{s:{r:3,c:0},e:{r:3,c:15}}];
+            wsSummary['!cols']=[{wch:5},{wch:28},{wch:16},{wch:16},{wch:18},{wch:22},{wch:20},{wch:18},{wch:20},{wch:22},{wch:24},{wch:18},{wch:18},{wch:20},{wch:18},{wch:14}];
+            if(summaryRows.length>6) wsSummary['!autofilter']={ref:`A6:P${summaryRows.length}`};
             for(let rr=6;rr<summaryRows.length;rr++){
-                [2,3,6,9,10,12,13].forEach(cc=>{ const cell=wsSummary[XLSX.utils.encode_cell({r:rr,c:cc})]; if(cell&&cell.t==='n') cell.z=moneyFormat; });
-                [4,8].forEach(cc=>{ const hourCell=wsSummary[XLSX.utils.encode_cell({r:rr,c:cc})]; if(hourCell&&hourCell.t==='n') hourCell.z='0.00'; });
+                [2,3,7,10,11,13,14].forEach(cc=>{ const cell=wsSummary[XLSX.utils.encode_cell({r:rr,c:cc})]; if(cell&&cell.t==='n') cell.z=moneyFormat; });
+                [4,5,9].forEach(cc=>{ const hourCell=wsSummary[XLSX.utils.encode_cell({r:rr,c:cc})]; if(hourCell&&hourCell.t==='n') hourCell.z='0.00'; });
             }
 
             // SHEET 2 — DETAIL POTONGAN
@@ -2562,9 +2595,9 @@
             const user = { id:localDevUid, name };
             const reportWarnings = new Set();
             const basisMap = await window.calculatePayrollPeriodBasis([user], period, reportWarnings);
-            const b = basisMap[localDevUid] || {requiredMinutes:0,requiredTaskCount:0,hourlyRate:0,baseSalary:0};
+            const b = basisMap[localDevUid] || {workMinutes:0,taskMinutes:0,requiredTaskCount:0,hourlyRate:0,baseSalary:0};
             const sum = {
-                uid:localDevUid,name,hourlyRate:b.hourlyRate,baseSalary:b.baseSalary,periodRequiredMinutes:b.requiredMinutes,periodRequiredTaskCount:b.requiredTaskCount,
+                uid:localDevUid,name,hourlyRate:b.hourlyRate,baseSalary:b.baseSalary,periodWorkMinutes:b.workMinutes,periodTaskMinutes:b.taskMinutes,periodRequiredMinutes:b.workMinutes,periodRequiredTaskCount:b.requiredTaskCount,
                 deductionWork:0,deductionNoCheck:0,totalDeduction:0,pendingPotential:0,pendingCount:0,lostMinutes:0,
                 requiredChecklistCount:0,checkedChecklistCount:0,missedChecklistCount:0,noCheckPenaltyCount:0,notDoneCount:0,workedWithoutCheckCount:0,validCount:0,details:[]
             };
@@ -2600,7 +2633,7 @@
                 cursor.setDate(cursor.getDate()+1);
             }
             window.applyPayrollPeriodCaps(sum);
-            return { period, through, summary:sum, warnings:[...reportWarnings], generatedAt:new Date(), calculationModel:'base_salary_divided_by_period_required_hours_v2' };
+            return { period, through, summary:sum, warnings:[...reportWarnings], generatedAt:new Date(), calculationModel:'base_salary_divided_by_official_work_hours_v3' };
         };
 
         window.renderMyPayrollReport = function(report) {
@@ -2629,7 +2662,7 @@
                                 <div class="text-[10px] font-black text-blue-950">Ringkasan Gaji</div>
                                 ${finalStatus}
                             </div>
-                            <div class="text-[8px] font-bold text-slate-400 mt-1">${window.formatRupiah(Math.round(s.hourlyRate))}/jam periode • ${s.baseSalary > 0 ? 'Gaji pokok ' + window.formatRupiah(s.baseSalary) : 'Gaji pokok belum diatur'} • ${(s.periodRequiredMinutes/60).toFixed(2)} jam tugas periode</div>
+                            <div class="text-[8px] font-bold text-slate-400 mt-1">${window.formatRupiah(Math.round(s.hourlyRate))}/jam periode • ${s.baseSalary > 0 ? 'Gaji pokok ' + window.formatRupiah(s.baseSalary) : 'Gaji pokok belum diatur'} • ${(s.periodWorkMinutes/60).toFixed(2)} jam kerja periode • ${(s.periodTaskMinutes/60).toFixed(2)} jam tugas ceklis</div>
                         </div>
                         <div class="text-right shrink-0">
                             <div class="text-[8px] font-black text-slate-400 uppercase">Total Potongan Final</div>
@@ -2671,7 +2704,7 @@
                     <div class="bg-slate-50 border border-slate-100 rounded-xl p-3">
                         <div class="text-[8px] font-black text-slate-500 uppercase">Jam Tidak Dikerjakan</div>
                         <div class="text-[13px] font-black text-slate-700 mt-1">${(s.lostMinutes/60).toFixed(2)} jam</div>
-                        <div class="text-[8px] font-bold text-slate-400 mt-1">dari ${(Number(s.periodRequiredMinutes||0)/60).toFixed(2)} jam tugas periode</div>
+                        <div class="text-[8px] font-bold text-slate-400 mt-1">dari ${(Number(s.periodWorkMinutes||0)/60).toFixed(2)} jam kerja periode</div>
                     </div>
                     <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 col-span-2">
                         <div class="flex items-center justify-between gap-3">
